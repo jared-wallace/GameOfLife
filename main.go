@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/faiface/pixel"
 	"github.com/faiface/pixel/pixelgl"
 	"github.com/faiface/pixel/text"
@@ -36,6 +37,7 @@ func (p *point) getNeighborCount(pop []point) int {
 			}
 		}
 	}
+	fmt.Println("Neighbor count: ", count, " and pop: ", pop)
 	return count
 }
 
@@ -75,10 +77,19 @@ func run() {
 }
 
 func popExists(pop []point) bool {
+	fmt.Println("Checking if pop exists")
 	return len(pop) > 0
 }
 
 func analyzePop(pop []point) []point {
+	fmt.Println("Analyzing")
+	currCount := 0
+	for _, p := range pop {
+		if p.alive {
+			currCount++
+		}
+	}
+	fmt.Println("Current count: ", currCount)
 	for _, p := range pop {
 		n := p.getNeighborCount(pop)
 		switch n {
@@ -92,11 +103,22 @@ func analyzePop(pop []point) []point {
 			p.alive = false
 		}
 	}
+	currCount = 0
+	for _, p := range pop {
+		if p.alive {
+			currCount++
+		}
+	}
+	fmt.Println("New count: ", currCount)
 	return pop
 }
 
 func drawPop(atlas *text.Atlas, win *pixelgl.Window, pop []point) {
+	fmt.Println("Drawing")
 	for _, point := range pop {
+		if !point.alive {
+			continue
+		}
 		x := point.x
 		y := point.y
 		t := text.New(pixel.V(float64(x*10), float64(y*10)), atlas)
