@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"github.com/faiface/pixel"
 	"github.com/faiface/pixel/pixelgl"
 	"github.com/faiface/pixel/text"
@@ -16,28 +15,22 @@ func main() {
 	pixelgl.Run(run)
 }
 
-const REFRESH = 1500
+const REFRESH = 100
 
 type point struct {
-	x     int
-	y     int
-	alive bool
+	x int
+	y int
 }
 
-func (p *point) getNeighborCount(pop []point) int {
+func getNeighborCount(p point, pop map[point]bool) int {
 	count := 0
-	for _, point := range pop {
-		if point.x == p.x && point.y == p.y {
-			continue
-		}
-		if (point.x == p.x-1 || point.x == p.x+1 || point.x == p.x) &&
-			(point.y == p.y-1 || point.y == p.y+1 || point.y == p.y) {
-			if point.alive {
-				count++
-			}
+	offsets := []point{{-1, 0}, {1, 0}, {0, -1}, {0, 1}, {-1, -1}, {1, -1}, {-1, 1}, {1, 1}}
+	for _, offset := range offsets {
+		neighbor := point{p.x + offset.x, p.y + offset.y}
+		if pop[neighbor] {
+			count++
 		}
 	}
-	fmt.Println("Neighbor count: ", count) //, " and pop: ", pop)
 	return count
 }
 
@@ -72,101 +65,72 @@ func run() {
 	}
 }
 
-func popExists(pop []point) bool {
-	fmt.Printf("Checking if pop exists...")
-	for _, p := range pop {
-		if p.alive {
-			fmt.Printf("yes.\n")
+func popExists(pop map[point]bool) bool {
+	for _, alive := range pop {
+		if alive {
 			return true
 		}
 	}
-	fmt.Printf("no.\n")
 	return false
 }
 
-func analyzePop(pop []point) []point {
-	fmt.Println("Analyzing")
-	currCount := 0
-	for _, p := range pop {
-		if p.alive {
-			currCount++
-		}
-	}
-	fmt.Println("Current count: ", currCount)
-	for idx, _ := range pop {
-		p := &pop[idx]
-		n := p.getNeighborCount(pop)
-		switch n {
-		case 0, 1:
-			//fmt.Println("Killing point: ", p.x, ", ", p.y)
-			p.alive = false
-		case 2:
-			fallthrough
-		case 3:
-			if p.alive {
-				//fmt.Println("Leaving point: ", p.x, ", ", p.y)
-			} else {
-				//fmt.Println("Reviving point: ", p.x, ", ", p.y)
-				p.alive = true
+func analyzePop(pop map[point]bool) map[point]bool {
+	nextGen := map[point]bool{}
+	for x := 0; x < 102; x++ {
+		for y := 0; y < 76; y++ {
+			p := point{x: x, y: y}
+			n := getNeighborCount(p, pop)
+			if n == 3 || (n == 2 && pop[p]) {
+				nextGen[p] = true
 			}
-		default:
-			//fmt.Println("Killing point: ", p.x, ", ", p.y)
-			p.alive = false
-			//fmt.Printf("Point is now: %v\n", p)
-			//fmt.Println("Point is now: ", p.alive)
 		}
 	}
-	currCount = 0
-	for _, p := range pop {
-		if p.alive {
-			currCount++
-		}
-	}
-	fmt.Println("New count: ", currCount)
-	return pop
+	return nextGen
 }
 
-func drawPop(atlas *text.Atlas, win *pixelgl.Window, pop []point) {
-	fmt.Println("Drawing")
-	for _, point := range pop {
-		if !point.alive {
+func drawPop(atlas *text.Atlas, win *pixelgl.Window, pop map[point]bool) {
+	t := text.New(pixel.V(0, 0), atlas)
+	for point, alive := range pop {
+		if !alive {
 			continue
 		}
-		x := point.x
-		y := point.y
-		t := text.New(pixel.V(float64(x*10), float64(y*10)), atlas)
+		t.Clear()
+		t.Dot = pixel.V(float64(point.x*10), float64(point.y*10))
 		_, _ = t.WriteString("x")
 		t.Draw(win, pixel.IM.Scaled(t.Orig, 1))
 	}
 }
 
-func getInitial() []point {
-	res := make([]point, 0)
+func getPoint(x int, y int) point {
+	return point{
+		x: x,
+		y: y,
+	}
+}
+
+func getOscillator() map[point]bool {
+	res := map[point]bool{}
+	res[getPoint(10, 10)] = true
+	res[getPoint(10, 11)] = true
+	res[getPoint(10, 12)] = true
+	return res
+}
+
+func getInitial() map[point]bool {
+	//getOscillator()
+	res := map[point]bool{}
 	min := 0
 	maxX := 102
 	maxY := 76
 	rand.Seed(time.Now().UnixNano())
-	for i := 0; i < 70; i++ {
-		for j := 0; j < 3; j++ {
-			xVal := j
-			yVal := i
-			t := point{
-				x:     xVal,
-				y:     yVal,
-				alive: true,
-			}
-			res = append(res, t)
-		}
-	}
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 10000; i++ {
 		xVal := rand.Intn(maxX-min+1) + min
 		yVal := rand.Intn(maxY-min+1) + min
-		t := point{
-			x:     xVal,
-			y:     yVal,
-			alive: true,
+		pt := getPoint(xVal, yVal)
+		if res[pt] {
+			continue
 		}
-		res = append(res, t)
+		res[pt] = true
 	}
 	return res
 }
