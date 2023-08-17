@@ -4,6 +4,7 @@ import (
 	"github.com/faiface/pixel"
 	"github.com/faiface/pixel/pixelgl"
 	"github.com/faiface/pixel/text"
+	"github.expedia.biz/jarwallace/gol/internal/models"
 	"golang.org/x/image/colornames"
 	"golang.org/x/image/font/basicfont"
 	_ "image/png"
@@ -15,40 +16,17 @@ func main() {
 	pixelgl.Run(run)
 }
 
-const REFRESH = 10
+const REFRESH = 16
 const winXMax = 2048
 const winYMax = 1536
-const concurrencyMax = 500
-
-type point struct {
-	x int
-	y int
-}
-
-type cell struct {
-	point
-	alive bool
-	color pixel.RGBA
-}
-
-func getNeighborCount(p point, pop map[point]cell) int {
-	count := 0
-	offsets := []point{{x: -1, y: 0}, {x: 1, y: 0}, {x: 0, y: -1}, {x: 0, y: 1}, {x: -1, y: -1}, {x: 1, y: -1}, {x: -1, y: 1}, {x: 1, y: 1}}
-	for _, offset := range offsets {
-		neighbor := point{x: p.x + offset.x, y: p.y + offset.y}
-		if pop[neighbor].alive {
-			count++
-		}
-	}
-	return count
-}
+const concurrencyMax = 204
 
 func run() {
 	cfg := pixelgl.WindowConfig{
-		Title:   "Conway's Game of Life",
-		Bounds:  pixel.R(0, 0, winXMax, winYMax),
-		VSync:   true,
-		Monitor: pixelgl.PrimaryMonitor(),
+		Title:  "Conway's Game of Life",
+		Bounds: pixel.R(0, 0, winXMax, winYMax),
+		VSync:  true,
+		//Monitor: pixelgl.PrimaryMonitor(),
 	}
 	win, err := pixelgl.NewWindow(cfg)
 	if err != nil {
@@ -71,32 +49,31 @@ func run() {
 		if !popExists(currGen) {
 			break // Exit the loop if there are no alive cells
 		}
-		//currGen = analyzePop(currGen)
 		currGen = analyzePopConcurrent(currGen)
 		win.Update()
 	}
 }
 
-func popExists(pop map[point]cell) bool {
+func popExists(pop map[models.Point]models.Cell) bool {
 	for _, cell := range pop {
-		if cell.alive {
+		if cell.Alive {
 			return true
 		}
 	}
 	return false
 }
 
-func analyzePop(pop map[point]cell) map[point]cell {
-	nextGen := map[point]cell{}
+func analyzePop(pop map[models.Point]models.Cell) map[models.Point]models.Cell {
+	nextGen := map[models.Point]models.Cell{}
 	for x := 0; x < winXMax/10; x++ {
 		for y := 0; y < winYMax/10; y++ {
-			p := point{x: x, y: y}
+			p := models.Point{X: x, Y: y}
 			n := getNeighborCount(p, pop)
-			if n == 3 || (n == 2 && pop[p].point == p) {
+			if n == 3 || (n == 2 && pop[p].Point == p) {
 				if _, exists := pop[p]; exists {
 					nextGen[p] = pop[p]
 				} else {
-					nextGen[p] = cell{point: p, alive: true, color: randomColor()}
+					nextGen[p] = models.Cell{Point: p, Alive: true, Color: randomColor()}
 				}
 			}
 		}
@@ -104,10 +81,10 @@ func analyzePop(pop map[point]cell) map[point]cell {
 	return nextGen
 }
 
-func analyzePopConcurrent(pop map[point]cell) map[point]cell {
-	nextGen := map[point]cell{}
+func analyzePopConcurrent(pop map[models.Point]models.Cell) map[models.Point]models.Cell {
+	nextGen := map[models.Point]models.Cell{}
 	numGoroutines := concurrencyMax / (winXMax / 10)
-	results := make(chan map[point]cell, numGoroutines)
+	results := make(chan map[models.Point]models.Cell, numGoroutines)
 
 	// calculate the step size for x based on the number of goroutines
 	step := (winXMax / 10) / numGoroutines
@@ -118,16 +95,16 @@ func analyzePopConcurrent(pop map[point]cell) map[point]cell {
 		endX := startX + step
 
 		go func(startX, endX int) {
-			partialNextGen := map[point]cell{}
+			partialNextGen := map[models.Point]models.Cell{}
 			for x := startX; x < endX; x++ {
 				for y := 0; y < winYMax/10; y++ {
-					p := point{x: x, y: y}
+					p := models.Point{X: x, Y: y}
 					n := getNeighborCount(p, pop)
-					if n == 3 || (n == 2 && pop[p].point == p) {
+					if n == 3 || (n == 2 && pop[p].Point == p) {
 						if _, exists := pop[p]; exists {
 							partialNextGen[p] = pop[p]
 						} else {
-							partialNextGen[p] = cell{point: p, alive: true, color: randomColor()}
+							partialNextGen[p] = models.Cell{Point: p, Alive: true, Color: randomColor()}
 						}
 					}
 				}
@@ -147,29 +124,29 @@ func analyzePopConcurrent(pop map[point]cell) map[point]cell {
 	return nextGen
 }
 
-func drawPop(atlas *text.Atlas, win *pixelgl.Window, pop map[point]cell) {
+func drawPop(atlas *text.Atlas, win *pixelgl.Window, pop map[models.Point]models.Cell) {
 	t := text.New(pixel.V(0, 0), atlas)
 	for point, cell := range pop {
-		if !cell.alive {
+		if !cell.Alive {
 			continue
 		}
 		t.Clear()
-		t.Color = cell.color
-		t.Dot = pixel.V(float64(point.x*10), float64(point.y*10))
+		t.Color = cell.Color
+		t.Dot = pixel.V(float64(point.X*10), float64(point.Y*10))
 		_, _ = t.WriteString("x")
 		t.Draw(win, pixel.IM.Scaled(t.Orig, 1))
 	}
 }
 
-func getPoint(x int, y int) point {
-	return point{
-		x: x,
-		y: y,
+func getPoint(x int, y int) models.Point {
+	return models.Point{
+		X: x,
+		Y: y,
 	}
 }
 
-func getInitial() map[point]cell {
-	res := map[point]cell{}
+func getInitial() map[models.Point]models.Cell {
+	res := map[models.Point]models.Cell{}
 	min := 0
 	maxX := winXMax / 10
 	maxY := winYMax / 10
@@ -178,7 +155,7 @@ func getInitial() map[point]cell {
 		xVal := rand.Intn(maxX-min+1) + min
 		yVal := rand.Intn(maxY-min+1) + min
 		pt := getPoint(xVal, yVal)
-		res[pt] = cell{point: pt, alive: true, color: randomColor()}
+		res[pt] = models.Cell{Point: pt, Alive: true, Color: randomColor()}
 	}
 	return res
 }
@@ -190,4 +167,16 @@ func randomColor() pixel.RGBA {
 		B: float64(rand.Float32()),
 		A: 1,
 	}
+}
+
+func getNeighborCount(p models.Point, pop map[models.Point]models.Cell) int {
+	count := 0
+	offsets := []models.Point{{X: -1, Y: 0}, {X: 1, Y: 0}, {X: 0, Y: -1}, {X: 0, Y: 1}, {X: -1, Y: -1}, {X: 1, Y: -1}, {X: -1, Y: 1}, {X: 1, Y: 1}}
+	for _, offset := range offsets {
+		neighbor := models.Point{X: p.X + offset.X, Y: p.Y + offset.Y}
+		if pop[neighbor].Alive {
+			count++
+		}
+	}
+	return count
 }
