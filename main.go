@@ -15,7 +15,7 @@ func main() {
 	pixelgl.Run(run)
 }
 
-const REFRESH = 100
+const REFRESH = 10
 
 type point struct {
 	x int
@@ -52,9 +52,12 @@ func run() {
 	win.Clear(colornames.Navy)
 	currGen := getInitial()
 	for !win.Closed() {
-		win.Clear(colornames.Navy)
+		if win.JustPressed(pixelgl.MouseButtonLeft) {
+			currGen = getInitial()
+		}
+		win.Clear(colornames.Black)
 		drawPop(atlas, win, currGen)
-		win.Update()
+		//win.Update()
 		time.Sleep(REFRESH * time.Millisecond) // Delay to observe the generation
 
 		if !popExists(currGen) {
@@ -95,6 +98,7 @@ func drawPop(atlas *text.Atlas, win *pixelgl.Window, pop map[point]bool) {
 			continue
 		}
 		t.Clear()
+		t.Color = randomColor()
 		t.Dot = pixel.V(float64(point.x*10), float64(point.y*10))
 		_, _ = t.WriteString("x")
 		t.Draw(win, pixel.IM.Scaled(t.Orig, 1))
@@ -108,16 +112,7 @@ func getPoint(x int, y int) point {
 	}
 }
 
-func getOscillator() map[point]bool {
-	res := map[point]bool{}
-	res[getPoint(10, 10)] = true
-	res[getPoint(10, 11)] = true
-	res[getPoint(10, 12)] = true
-	return res
-}
-
 func getInitial() map[point]bool {
-	//getOscillator()
 	res := map[point]bool{}
 	min := 0
 	maxX := 102
@@ -133,4 +128,13 @@ func getInitial() map[point]bool {
 		res[pt] = true
 	}
 	return res
+}
+
+func randomColor() pixel.RGBA {
+	return pixel.RGBA{
+		R: float64(rand.Float32()),
+		G: float64(rand.Float32()),
+		B: float64(rand.Float32()),
+		A: 1,
+	}
 }
