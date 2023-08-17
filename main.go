@@ -7,6 +7,7 @@ import (
 	"golang.org/x/image/colornames"
 	"golang.org/x/image/font/basicfont"
 	_ "image/png"
+	"math/rand"
 	"time"
 )
 
@@ -17,8 +18,25 @@ func main() {
 const REFRESH = 500
 
 type point struct {
-	x int
-	y int
+	x     int
+	y     int
+	alive bool
+}
+
+func (p *point) getNeighborCount(pop []point) int {
+	count := 0
+	for _, point := range pop {
+		if point.x == p.x && point.y == p.y {
+			continue
+		}
+		if (point.x == p.x-1 || point.x == p.x+1 || point.x == p.x) &&
+			(point.y == p.y-1 || point.y == p.y+1 || point.y == p.y) {
+			if point.alive {
+				count++
+			}
+		}
+	}
+	return count
 }
 
 func run() {
@@ -37,26 +55,44 @@ func run() {
 	)
 
 	win.Clear(colornames.Navy)
-	init := getInitial(atlas)
+	init := getInitial()
 	for !win.Closed() {
 		win.Clear(colornames.Navy)
-		for _, point := range init {
-			point.Draw(win, pixel.IM.Scaled(point.Orig, 1))
-		}
+		drawPop(atlas, win, init)
 		// main loop
 		currGen := init
 		for popExists(currGen) {
 			time.Sleep(REFRESH * time.Millisecond)
-			nextGen := analyzePop(atlas)
+			nextGen := analyzePop(currGen)
 			win.Clear(colornames.Navy)
-			for _, point := range nextGen {
-				point.Draw(win, pixel.IM.Scaled(point.Orig, 1))
-			}
+			drawPop(atlas, win, nextGen)
+			currGen = nextGen
 			win.Update()
 		}
 
 		win.Update()
 	}
+}
+
+func popExists(pop []point) bool {
+	return len(pop) > 0
+}
+
+func analyzePop(pop []point) []point {
+	for _, p := range pop {
+		n := p.getNeighborCount(pop)
+		switch n {
+		case 0, 1:
+			p.alive = false
+		case 2:
+			fallthrough
+		case 3:
+			p.alive = true
+		default:
+			p.alive = false
+		}
+	}
+	return pop
 }
 
 func drawPop(atlas *text.Atlas, win *pixelgl.Window, pop []point) {
@@ -69,14 +105,30 @@ func drawPop(atlas *text.Atlas, win *pixelgl.Window, pop []point) {
 	}
 }
 
-func getInitial(atlas *text.Atlas) []*text.Text {
-	res := make([]*text.Text, 0)
-	for x := 10; x < 1020; x += 10 {
-		for y := 10; y < 760; y += 10 {
-			t := text.New(pixel.V(float64(x), float64(y)), atlas)
-			t.WriteString("x")
-			res = append(res, t)
+func getInitial() []point {
+	res := make([]point, 0)
+	min := 0
+	maxX := 102
+	maxY := 76
+	for i := 0; i < 100; i++ {
+		rand.Seed(time.Now().UnixNano())
+		xVal := rand.Intn(maxX-min+1) + min
+		yVal := rand.Intn(maxY-min+1) + min
+		t := point{
+			x:     xVal,
+			y:     yVal,
+			alive: true,
 		}
+		res = append(res, t)
 	}
+	rand.Seed(time.Now().UnixNano())
+	xVal := rand.Intn(maxX-min+1) + min
+	yVal := rand.Intn(maxY-min+1) + min
+	t := point{
+		x:     xVal,
+		y:     yVal,
+		alive: true,
+	}
+	res = append(res, t)
 	return res
 }
