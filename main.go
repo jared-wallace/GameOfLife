@@ -45,9 +45,10 @@ func getNeighborCount(p point, pop map[point]cell) int {
 
 func run() {
 	cfg := pixelgl.WindowConfig{
-		Title:  "Conway's Game of Life",
-		Bounds: pixel.R(0, 0, winXMax, winYMax),
-		VSync:  true,
+		Title:   "Conway's Game of Life",
+		Bounds:  pixel.R(0, 0, winXMax, winYMax),
+		VSync:   true,
+		Monitor: pixelgl.PrimaryMonitor(),
 	}
 	win, err := pixelgl.NewWindow(cfg)
 	if err != nil {
