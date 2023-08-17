@@ -16,18 +16,26 @@ func main() {
 }
 
 const REFRESH = 10
+const winXMax = 2048
+const winYMax = 1536
 
 type point struct {
 	x int
 	y int
 }
 
-func getNeighborCount(p point, pop map[point]bool) int {
+type cell struct {
+	point
+	alive bool
+	color pixel.RGBA
+}
+
+func getNeighborCount(p point, pop map[point]cell) int {
 	count := 0
-	offsets := []point{{-1, 0}, {1, 0}, {0, -1}, {0, 1}, {-1, -1}, {1, -1}, {-1, 1}, {1, 1}}
+	offsets := []point{{x: -1, y: 0}, {x: 1, y: 0}, {x: 0, y: -1}, {x: 0, y: 1}, {x: -1, y: -1}, {x: 1, y: -1}, {x: -1, y: 1}, {x: 1, y: 1}}
 	for _, offset := range offsets {
-		neighbor := point{p.x + offset.x, p.y + offset.y}
-		if pop[neighbor] {
+		neighbor := point{x: p.x + offset.x, y: p.y + offset.y}
+		if pop[neighbor].alive {
 			count++
 		}
 	}
@@ -37,7 +45,7 @@ func getNeighborCount(p point, pop map[point]bool) int {
 func run() {
 	cfg := pixelgl.WindowConfig{
 		Title:  "Conway's Game of Life",
-		Bounds: pixel.R(0, 0, 1024, 768),
+		Bounds: pixel.R(0, 0, winXMax, winYMax),
 		VSync:  true,
 	}
 	win, err := pixelgl.NewWindow(cfg)
@@ -49,7 +57,6 @@ func run() {
 		[]rune{'x'},
 	)
 
-	win.Clear(colornames.Navy)
 	currGen := getInitial()
 	for !win.Closed() {
 		if win.JustPressed(pixelgl.MouseButtonLeft) {
@@ -57,7 +64,6 @@ func run() {
 		}
 		win.Clear(colornames.Black)
 		drawPop(atlas, win, currGen)
-		//win.Update()
 		time.Sleep(REFRESH * time.Millisecond) // Delay to observe the generation
 
 		if !popExists(currGen) {
@@ -68,37 +74,41 @@ func run() {
 	}
 }
 
-func popExists(pop map[point]bool) bool {
-	for _, alive := range pop {
-		if alive {
+func popExists(pop map[point]cell) bool {
+	for _, cell := range pop {
+		if cell.alive {
 			return true
 		}
 	}
 	return false
 }
 
-func analyzePop(pop map[point]bool) map[point]bool {
-	nextGen := map[point]bool{}
-	for x := 0; x < 102; x++ {
-		for y := 0; y < 76; y++ {
+func analyzePop(pop map[point]cell) map[point]cell {
+	nextGen := map[point]cell{}
+	for x := 0; x < winXMax/10; x++ {
+		for y := 0; y < winYMax/10; y++ {
 			p := point{x: x, y: y}
 			n := getNeighborCount(p, pop)
-			if n == 3 || (n == 2 && pop[p]) {
-				nextGen[p] = true
+			if n == 3 || (n == 2 && pop[p].point == p) {
+				if _, exists := pop[p]; exists {
+					nextGen[p] = pop[p]
+				} else {
+					nextGen[p] = cell{point: p, alive: true, color: randomColor()}
+				}
 			}
 		}
 	}
 	return nextGen
 }
 
-func drawPop(atlas *text.Atlas, win *pixelgl.Window, pop map[point]bool) {
+func drawPop(atlas *text.Atlas, win *pixelgl.Window, pop map[point]cell) {
 	t := text.New(pixel.V(0, 0), atlas)
-	for point, alive := range pop {
-		if !alive {
+	for point, cell := range pop {
+		if !cell.alive {
 			continue
 		}
 		t.Clear()
-		t.Color = randomColor()
+		t.Color = cell.color
 		t.Dot = pixel.V(float64(point.x*10), float64(point.y*10))
 		_, _ = t.WriteString("x")
 		t.Draw(win, pixel.IM.Scaled(t.Orig, 1))
@@ -112,20 +122,17 @@ func getPoint(x int, y int) point {
 	}
 }
 
-func getInitial() map[point]bool {
-	res := map[point]bool{}
+func getInitial() map[point]cell {
+	res := map[point]cell{}
 	min := 0
-	maxX := 102
-	maxY := 76
+	maxX := winXMax / 10
+	maxY := winYMax / 10
 	rand.Seed(time.Now().UnixNano())
-	for i := 0; i < 10000; i++ {
+	for i := 0; i < 20000; i++ {
 		xVal := rand.Intn(maxX-min+1) + min
 		yVal := rand.Intn(maxY-min+1) + min
 		pt := getPoint(xVal, yVal)
-		if res[pt] {
-			continue
-		}
-		res[pt] = true
+		res[pt] = cell{point: pt, alive: true, color: randomColor()}
 	}
 	return res
 }
