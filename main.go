@@ -5,6 +5,7 @@ import (
 	"github.com/faiface/pixel/pixelgl"
 	"github.com/faiface/pixel/text"
 	"github.expedia.biz/jarwallace/gol/internal/models"
+	"github.expedia.biz/jarwallace/gol/internal/processor"
 	"golang.org/x/image/colornames"
 	"golang.org/x/image/font/basicfont"
 	_ "image/png"
@@ -19,7 +20,6 @@ func main() {
 const REFRESH = 16
 const winXMax = 2048
 const winYMax = 1536
-const concurrencyMax = 204
 
 func run() {
 	cfg := pixelgl.WindowConfig{
@@ -49,7 +49,7 @@ func run() {
 		if !popExists(currGen) {
 			break // Exit the loop if there are no alive cells
 		}
-		currGen = analyzePopConcurrent(currGen)
+		currGen = processor.AnalyzePopConcurrent(currGen, winXMax, winYMax)
 		win.Update()
 	}
 }
@@ -61,67 +61,6 @@ func popExists(pop map[models.Point]models.Cell) bool {
 		}
 	}
 	return false
-}
-
-func analyzePop(pop map[models.Point]models.Cell) map[models.Point]models.Cell {
-	nextGen := map[models.Point]models.Cell{}
-	for x := 0; x < winXMax/10; x++ {
-		for y := 0; y < winYMax/10; y++ {
-			p := models.Point{X: x, Y: y}
-			n := getNeighborCount(p, pop)
-			if n == 3 || (n == 2 && pop[p].Point == p) {
-				if _, exists := pop[p]; exists {
-					nextGen[p] = pop[p]
-				} else {
-					nextGen[p] = models.Cell{Point: p, Alive: true, Color: randomColor()}
-				}
-			}
-		}
-	}
-	return nextGen
-}
-
-func analyzePopConcurrent(pop map[models.Point]models.Cell) map[models.Point]models.Cell {
-	nextGen := map[models.Point]models.Cell{}
-	numGoroutines := concurrencyMax / (winXMax / 10)
-	results := make(chan map[models.Point]models.Cell, numGoroutines)
-
-	// calculate the step size for x based on the number of goroutines
-	step := (winXMax / 10) / numGoroutines
-
-	for i := 0; i < numGoroutines; i++ {
-		// Calculate the range for each goroutine
-		startX := i * step
-		endX := startX + step
-
-		go func(startX, endX int) {
-			partialNextGen := map[models.Point]models.Cell{}
-			for x := startX; x < endX; x++ {
-				for y := 0; y < winYMax/10; y++ {
-					p := models.Point{X: x, Y: y}
-					n := getNeighborCount(p, pop)
-					if n == 3 || (n == 2 && pop[p].Point == p) {
-						if _, exists := pop[p]; exists {
-							partialNextGen[p] = pop[p]
-						} else {
-							partialNextGen[p] = models.Cell{Point: p, Alive: true, Color: randomColor()}
-						}
-					}
-				}
-			}
-			results <- partialNextGen
-		}(startX, endX)
-	}
-
-	// Merge results from all goroutines
-	for i := 0; i < numGoroutines; i++ {
-		partialNextGen := <-results
-		for k, v := range partialNextGen {
-			nextGen[k] = v
-		}
-	}
-
-	return nextGen
 }
 
 func drawPop(atlas *text.Atlas, win *pixelgl.Window, pop map[models.Point]models.Cell) {
