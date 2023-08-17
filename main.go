@@ -16,7 +16,7 @@ func main() {
 	pixelgl.Run(run)
 }
 
-const REFRESH = 500
+const REFRESH = 1500
 
 type point struct {
 	x     int
@@ -37,7 +37,7 @@ func (p *point) getNeighborCount(pop []point) int {
 			}
 		}
 	}
-	fmt.Println("Neighbor count: ", count, " and pop: ", pop)
+	fmt.Println("Neighbor count: ", count) //, " and pop: ", pop)
 	return count
 }
 
@@ -57,28 +57,31 @@ func run() {
 	)
 
 	win.Clear(colornames.Navy)
-	init := getInitial()
+	currGen := getInitial()
 	for !win.Closed() {
 		win.Clear(colornames.Navy)
-		drawPop(atlas, win, init)
-		// main loop
-		currGen := init
-		for popExists(currGen) {
-			time.Sleep(REFRESH * time.Millisecond)
-			nextGen := analyzePop(currGen)
-			win.Clear(colornames.Navy)
-			drawPop(atlas, win, nextGen)
-			currGen = nextGen
-			win.Update()
-		}
+		drawPop(atlas, win, currGen)
+		win.Update()
+		time.Sleep(REFRESH * time.Millisecond) // Delay to observe the generation
 
+		if !popExists(currGen) {
+			break // Exit the loop if there are no alive cells
+		}
+		currGen = analyzePop(currGen)
 		win.Update()
 	}
 }
 
 func popExists(pop []point) bool {
-	fmt.Println("Checking if pop exists")
-	return len(pop) > 0
+	fmt.Printf("Checking if pop exists...")
+	for _, p := range pop {
+		if p.alive {
+			fmt.Printf("yes.\n")
+			return true
+		}
+	}
+	fmt.Printf("no.\n")
+	return false
 }
 
 func analyzePop(pop []point) []point {
@@ -90,17 +93,27 @@ func analyzePop(pop []point) []point {
 		}
 	}
 	fmt.Println("Current count: ", currCount)
-	for _, p := range pop {
+	for idx, _ := range pop {
+		p := &pop[idx]
 		n := p.getNeighborCount(pop)
 		switch n {
 		case 0, 1:
+			//fmt.Println("Killing point: ", p.x, ", ", p.y)
 			p.alive = false
 		case 2:
 			fallthrough
 		case 3:
-			p.alive = true
+			if p.alive {
+				//fmt.Println("Leaving point: ", p.x, ", ", p.y)
+			} else {
+				//fmt.Println("Reviving point: ", p.x, ", ", p.y)
+				p.alive = true
+			}
 		default:
+			//fmt.Println("Killing point: ", p.x, ", ", p.y)
 			p.alive = false
+			//fmt.Printf("Point is now: %v\n", p)
+			//fmt.Println("Point is now: ", p.alive)
 		}
 	}
 	currCount = 0
@@ -132,8 +145,20 @@ func getInitial() []point {
 	min := 0
 	maxX := 102
 	maxY := 76
+	rand.Seed(time.Now().UnixNano())
+	for i := 0; i < 70; i++ {
+		for j := 0; j < 3; j++ {
+			xVal := j
+			yVal := i
+			t := point{
+				x:     xVal,
+				y:     yVal,
+				alive: true,
+			}
+			res = append(res, t)
+		}
+	}
 	for i := 0; i < 100; i++ {
-		rand.Seed(time.Now().UnixNano())
 		xVal := rand.Intn(maxX-min+1) + min
 		yVal := rand.Intn(maxY-min+1) + min
 		t := point{
@@ -143,14 +168,5 @@ func getInitial() []point {
 		}
 		res = append(res, t)
 	}
-	rand.Seed(time.Now().UnixNano())
-	xVal := rand.Intn(maxX-min+1) + min
-	yVal := rand.Intn(maxY-min+1) + min
-	t := point{
-		x:     xVal,
-		y:     yVal,
-		alive: true,
-	}
-	res = append(res, t)
 	return res
 }
