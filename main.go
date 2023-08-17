@@ -18,15 +18,20 @@ func main() {
 }
 
 const REFRESH = 16
-const winXMax = 2048
-const winYMax = 1536
+
+//const winXMax = 1536
+//const winYMax = 1152
 
 func run() {
+	monitor := pixelgl.PrimaryMonitor()
+	w, l := monitor.Size()
+	winXMax := int(w)
+	winYMax := int(l)
 	cfg := pixelgl.WindowConfig{
-		Title:  "Conway's Game of Life",
-		Bounds: pixel.R(0, 0, winXMax, winYMax),
-		VSync:  true,
-		//Monitor: pixelgl.PrimaryMonitor(),
+		Title:     "Conway's Game of Life",
+		Bounds:    pixel.R(0, 0, w, l),
+		VSync:     true,
+		Resizable: true,
 	}
 	win, err := pixelgl.NewWindow(cfg)
 	if err != nil {
@@ -37,10 +42,11 @@ func run() {
 		[]rune{'x'},
 	)
 
-	currGen := getInitial()
+	currGen := getInitial(winXMax, winYMax)
+	pr := processor.NewProcessor(winXMax, winYMax)
 	for !win.Closed() {
 		if win.JustPressed(pixelgl.MouseButtonLeft) {
-			currGen = getInitial()
+			currGen = getInitial(winXMax, winYMax)
 		}
 		win.Clear(colornames.Black)
 		drawPop(atlas, win, currGen)
@@ -49,7 +55,8 @@ func run() {
 		if !popExists(currGen) {
 			break // Exit the loop if there are no alive cells
 		}
-		currGen = processor.AnalyzePopConcurrent(currGen, winXMax, winYMax)
+		//currGen = pr.AnalyzePopConcurrent(currGen)
+		currGen = pr.AnalyzePopEfficiently(currGen)
 		win.Update()
 	}
 }
@@ -84,7 +91,7 @@ func getPoint(x int, y int) models.Point {
 	}
 }
 
-func getInitial() map[models.Point]models.Cell {
+func getInitial(winXMax, winYMax int) map[models.Point]models.Cell {
 	res := map[models.Point]models.Cell{}
 	min := 0
 	maxX := winXMax / 10
@@ -94,20 +101,10 @@ func getInitial() map[models.Point]models.Cell {
 		xVal := rand.Intn(maxX-min+1) + min
 		yVal := rand.Intn(maxY-min+1) + min
 		pt := getPoint(xVal, yVal)
-		res[pt] = models.Cell{Point: pt, Alive: true, Color: randomColor()}
+		res[pt] = models.Cell{Point: pt, Alive: true, Color: processor.RandomColor()}
 	}
 	return res
 }
-
-func randomColor() pixel.RGBA {
-	return pixel.RGBA{
-		R: float64(rand.Float32()),
-		G: float64(rand.Float32()),
-		B: float64(rand.Float32()),
-		A: 1,
-	}
-}
-
 func getNeighborCount(p models.Point, pop map[models.Point]models.Cell) int {
 	count := 0
 	offsets := []models.Point{{X: -1, Y: 0}, {X: 1, Y: 0}, {X: 0, Y: -1}, {X: 0, Y: 1}, {X: -1, Y: -1}, {X: 1, Y: -1}, {X: -1, Y: 1}, {X: 1, Y: 1}}
