@@ -18,6 +18,7 @@ func main() {
 const REFRESH = 10
 const winXMax = 2048
 const winYMax = 1536
+const concurrencyMax = 500
 
 type point struct {
 	x int
@@ -69,7 +70,8 @@ func run() {
 		if !popExists(currGen) {
 			break // Exit the loop if there are no alive cells
 		}
-		currGen = analyzePop(currGen)
+		//currGen = analyzePop(currGen)
+		currGen = analyzePopConcurrent(currGen)
 		win.Update()
 	}
 }
@@ -98,6 +100,49 @@ func analyzePop(pop map[point]cell) map[point]cell {
 			}
 		}
 	}
+	return nextGen
+}
+
+func analyzePopConcurrent(pop map[point]cell) map[point]cell {
+	nextGen := map[point]cell{}
+	numGoroutines := concurrencyMax / (winXMax / 10)
+	results := make(chan map[point]cell, numGoroutines)
+
+	// calculate the step size for x based on the number of goroutines
+	step := (winXMax / 10) / numGoroutines
+
+	for i := 0; i < numGoroutines; i++ {
+		// Calculate the range for each goroutine
+		startX := i * step
+		endX := startX + step
+
+		go func(startX, endX int) {
+			partialNextGen := map[point]cell{}
+			for x := startX; x < endX; x++ {
+				for y := 0; y < winYMax/10; y++ {
+					p := point{x: x, y: y}
+					n := getNeighborCount(p, pop)
+					if n == 3 || (n == 2 && pop[p].point == p) {
+						if _, exists := pop[p]; exists {
+							partialNextGen[p] = pop[p]
+						} else {
+							partialNextGen[p] = cell{point: p, alive: true, color: randomColor()}
+						}
+					}
+				}
+			}
+			results <- partialNextGen
+		}(startX, endX)
+	}
+
+	// Merge results from all goroutines
+	for i := 0; i < numGoroutines; i++ {
+		partialNextGen := <-results
+		for k, v := range partialNextGen {
+			nextGen[k] = v
+		}
+	}
+
 	return nextGen
 }
 
