@@ -4,8 +4,32 @@ import (
 	"github.expedia.biz/jarwallace/gol/internal/display"
 )
 
+func InjectRPentomino() map[Point]Cell {
+	init := Point{
+		X: 80,
+		Y: 50,
+	}
+	// set our bounds
+	minX := init.X
+	minY := init.Y
+	// create the R-pentamino
+	pop := map[Point]Cell{}
+	pop[Point{X: minX + 2, Y: minY + 3}] = Cell{Alive: true, Color: display.RandomColor()}
+
+	pop[Point{X: minX + 3, Y: minY + 2}] = Cell{Alive: true, Color: display.RandomColor()}
+	pop[Point{X: minX + 3, Y: minY + 3}] = Cell{Alive: true, Color: display.RandomColor()}
+	pop[Point{X: minX + 3, Y: minY + 4}] = Cell{Alive: true, Color: display.RandomColor()}
+
+	pop[Point{X: minX + 4, Y: minY + 4}] = Cell{Alive: true, Color: display.RandomColor()}
+	return pop
+
+}
+
 func InjectAcorn() map[Point]Cell {
-	init := getRandomPoint()
+	init := Point{
+		X: 80,
+		Y: 50,
+	}
 	// set our bounds
 	minX := init.X
 	minY := init.Y
@@ -27,8 +51,11 @@ func InjectAcorn() map[Point]Cell {
 func InjectGlider() map[Point]Cell {
 	// "gosper" glider gun
 	// grid required is 11 x 38
-	// pick a random starting point
-	init := getRandomPoint()
+	// pick a random starting point towards the top left
+	init := Point{
+		X: 10,
+		Y: 80,
+	}
 	// set our bounds
 	minX := init.X
 	minY := init.Y

@@ -44,11 +44,22 @@ func run() {
 	)
 
 	//currGen := getInitial(winXMax, winYMax)
-	currGen := models.InjectGlider()
+	currGen := models.InjectRPentomino()
 	pr := processor.NewProcessor(winXMax, winYMax)
+	clicks := 0
 	for !win.Closed() {
 		if win.JustPressed(pixelgl.MouseButtonLeft) {
-			currGen = getInitial(winXMax, winYMax)
+			switch clicks % 4 {
+			case 0:
+				currGen = models.InjectGlider()
+			case 1:
+				currGen = models.InjectAcorn()
+			case 2:
+				currGen = getInitial(winXMax, winYMax)
+			case 3:
+				currGen = models.InjectRPentomino()
+			}
+			clicks++
 		}
 		win.Clear(colornames.Black)
 		drawPop(atlas, win, currGen)
@@ -57,8 +68,7 @@ func run() {
 		if !popExists(currGen) {
 			break // Exit the loop if there are no alive cells
 		}
-		//currGen = pr.AnalyzePopEfficiently(currGen)
-		currGen = pr.AnalyzePop(currGen)
+		currGen = pr.AnalyzePopEfficiently(currGen)
 		win.Update()
 	}
 }

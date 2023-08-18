@@ -83,7 +83,7 @@ func (pr *processor) AnalyzePopEfficiently(pop map[models.Point]models.Cell) map
 			for idx := startIdx; idx < endIdx; idx++ {
 				p := pointsList[idx]
 				n := getNeighborCount(p, pop)
-				if n == 3 || (n == 2 && pop[p].Point == p) {
+				if n == 3 || (n == 2 && pop[p].Alive) {
 					if _, exists := pop[p]; exists {
 						partialNextGen[p] = pop[p]
 					} else {
@@ -138,7 +138,7 @@ func (pr *processor) AnalyzePopConcurrent(pop map[models.Point]models.Cell) map[
 				for y := 0; y < pr.winYMax/10; y++ {
 					p := models.Point{X: x, Y: y}
 					n := getNeighborCount(p, pop)
-					if n == 3 || (n == 2 && pop[p].Point == p) {
+					if n == 3 || (n == 2 && pop[p].Alive) {
 						if _, exists := pop[p]; exists {
 							partialNextGen[p] = pop[p]
 						} else {
