@@ -4,6 +4,7 @@ import (
 	"github.com/faiface/pixel"
 	"github.com/faiface/pixel/pixelgl"
 	"github.com/faiface/pixel/text"
+	"github.expedia.biz/jarwallace/gol/internal/display"
 	"github.expedia.biz/jarwallace/gol/internal/models"
 	"github.expedia.biz/jarwallace/gol/internal/processor"
 	"golang.org/x/image/colornames"
@@ -42,7 +43,8 @@ func run() {
 		[]rune{'x'},
 	)
 
-	currGen := getInitial(winXMax, winYMax)
+	//currGen := getInitial(winXMax, winYMax)
+	currGen := models.InjectGlider()
 	pr := processor.NewProcessor(winXMax, winYMax)
 	for !win.Closed() {
 		if win.JustPressed(pixelgl.MouseButtonLeft) {
@@ -55,8 +57,8 @@ func run() {
 		if !popExists(currGen) {
 			break // Exit the loop if there are no alive cells
 		}
-		//currGen = pr.AnalyzePopConcurrent(currGen)
-		currGen = pr.AnalyzePopEfficiently(currGen)
+		//currGen = pr.AnalyzePopEfficiently(currGen)
+		currGen = pr.AnalyzePop(currGen)
 		win.Update()
 	}
 }
@@ -101,7 +103,7 @@ func getInitial(winXMax, winYMax int) map[models.Point]models.Cell {
 		xVal := rand.Intn(maxX-min+1) + min
 		yVal := rand.Intn(maxY-min+1) + min
 		pt := getPoint(xVal, yVal)
-		res[pt] = models.Cell{Point: pt, Alive: true, Color: processor.RandomColor()}
+		res[pt] = models.Cell{Point: pt, Alive: true, Color: display.RandomColor()}
 	}
 	return res
 }

@@ -1,9 +1,8 @@
 package processor
 
 import (
-	"github.com/faiface/pixel"
+	"github.expedia.biz/jarwallace/gol/internal/display"
 	"github.expedia.biz/jarwallace/gol/internal/models"
-	"math/rand"
 )
 
 type processor struct {
@@ -31,17 +30,17 @@ func factors(n int) []int {
 	return result
 }
 
-func (pr *processor) analyzePop(pop map[models.Point]models.Cell) map[models.Point]models.Cell {
+func (pr *processor) AnalyzePop(pop map[models.Point]models.Cell) map[models.Point]models.Cell {
 	nextGen := map[models.Point]models.Cell{}
 	for x := 0; x < pr.winXMax/10; x++ {
 		for y := 0; y < pr.winYMax/10; y++ {
 			p := models.Point{X: x, Y: y}
 			n := getNeighborCount(p, pop)
-			if n == 3 || (n == 2 && pop[p].Point == p) {
+			if n == 3 || (n == 2 && pop[p].Alive) {
 				if _, exists := pop[p]; exists {
 					nextGen[p] = pop[p]
 				} else {
-					nextGen[p] = models.Cell{Point: p, Alive: true, Color: RandomColor()}
+					nextGen[p] = models.Cell{Point: p, Alive: true, Color: display.RandomColor()}
 				}
 			}
 		}
@@ -88,7 +87,7 @@ func (pr *processor) AnalyzePopEfficiently(pop map[models.Point]models.Cell) map
 					if _, exists := pop[p]; exists {
 						partialNextGen[p] = pop[p]
 					} else {
-						partialNextGen[p] = models.Cell{Point: p, Alive: true, Color: RandomColor()}
+						partialNextGen[p] = models.Cell{Point: p, Alive: true, Color: display.RandomColor()}
 					}
 				}
 			}
@@ -122,7 +121,7 @@ func getNeighborOffsets() []models.Point {
 
 func (pr *processor) AnalyzePopConcurrent(pop map[models.Point]models.Cell) map[models.Point]models.Cell {
 	nextGen := map[models.Point]models.Cell{}
-	numGoroutines := pr.concurrencyMax / (pr.winXMax / 10)
+	numGoroutines := pr.concurrencyMax
 	results := make(chan map[models.Point]models.Cell, numGoroutines)
 
 	// calculate the step size for x based on the number of goroutines
@@ -143,7 +142,7 @@ func (pr *processor) AnalyzePopConcurrent(pop map[models.Point]models.Cell) map[
 						if _, exists := pop[p]; exists {
 							partialNextGen[p] = pop[p]
 						} else {
-							partialNextGen[p] = models.Cell{Point: p, Alive: true, Color: RandomColor()}
+							partialNextGen[p] = models.Cell{Point: p, Alive: true, Color: display.RandomColor()}
 						}
 					}
 				}
@@ -173,13 +172,4 @@ func getNeighborCount(p models.Point, pop map[models.Point]models.Cell) int {
 		}
 	}
 	return count
-}
-
-func RandomColor() pixel.RGBA {
-	return pixel.RGBA{
-		R: float64(rand.Float32()),
-		G: float64(rand.Float32()),
-		B: float64(rand.Float32()),
-		A: 1,
-	}
 }
