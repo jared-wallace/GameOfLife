@@ -6,14 +6,12 @@ import (
 	"github.com/faiface/pixel/pixelgl"
 	"github.com/faiface/pixel/text"
 	"github.com/golang/freetype/truetype"
-	"github.expedia.biz/jarwallace/gol/internal/display"
 	"github.expedia.biz/jarwallace/gol/internal/models"
 	"github.expedia.biz/jarwallace/gol/internal/processor"
 	"golang.org/x/image/colornames"
 	"golang.org/x/image/font"
 	_ "image/png"
 	"io"
-	"math/rand"
 	"os"
 	"time"
 )
@@ -48,22 +46,15 @@ func run() {
 	}
 	atlas := text.NewAtlas(face, text.ASCII)
 
-	currGen := models.InjectRPentomino()
+	currGen := models.InjectRandom(winXMax, winYMax)
 	pr := processor.NewProcessor(winXMax, winYMax)
 	clicks := 0
 	generation := 0
+	pattern := "random"
 	for !win.Closed() {
 		if win.JustPressed(pixelgl.MouseButtonLeft) {
-			switch clicks % 4 {
-			case 0:
-				currGen = models.InjectGlider()
-			case 1:
-				currGen = models.InjectAcorn()
-			case 2:
-				currGen = getInitial(winXMax, winYMax)
-			case 3:
-				currGen = models.InjectRPentomino()
-			}
+			pattNum := clicks % models.NumPatterns
+			currGen, pattern = models.GetPattern(pattNum, winXMax, winYMax)
 			generation = 0
 			clicks++
 		}
@@ -76,7 +67,7 @@ func run() {
 		}
 		currGen = pr.AnalyzePopEfficiently(currGen)
 		txt := text.New(pixel.V(10, l-40), atlas) // This places the text near the top-left corner. Adjust as necessary.
-		fmt.Fprintf(txt, "Generation: %d", generation)
+		fmt.Fprintf(txt, "\"%s\": Generation: %d", pattern, generation)
 		txt.Draw(win, pixel.IM.Scaled(txt.Orig, 1))
 		generation++
 		win.Update()
@@ -104,28 +95,6 @@ func drawPop(atlas *text.Atlas, win *pixelgl.Window, pop map[models.Point]models
 		_, _ = t.WriteString("x")
 		t.Draw(win, pixel.IM)
 	}
-}
-
-func getPoint(x int, y int) models.Point {
-	return models.Point{
-		X: x,
-		Y: y,
-	}
-}
-
-func getInitial(winXMax, winYMax int) map[models.Point]models.Cell {
-	res := map[models.Point]models.Cell{}
-	min := 0
-	maxX := winXMax / 10
-	maxY := winYMax / 10
-	rand.Seed(time.Now().UnixNano())
-	for i := 0; i < 20000; i++ {
-		xVal := rand.Intn(maxX-min+1) + min
-		yVal := rand.Intn(maxY-min+1) + min
-		pt := getPoint(xVal, yVal)
-		res[pt] = models.Cell{Point: pt, Alive: true, Color: display.RandomColor()}
-	}
-	return res
 }
 
 func loadTTF(path string, size float64) (font.Face, error) {
