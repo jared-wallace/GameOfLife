@@ -1,0 +1,44 @@
+before:
+  hooks:
+    - go env -w GOPRIVATE=github.expedia.biz
+    - go mod tidy
+    - go generate ./...
+builds:
+  # You can have multiple builds defined as a yaml list
+  - id: "gol"
+    main: ./
+    binary: gol
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+archives:
+  - id: gol
+    builds:
+    - gol
+    format: binary
+checksum:
+  name_template: 'checksums.txt'
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+github_urls:
+  api: https://github.expedia.biz/api/v3/
+  upload: https://github.expedia.biz/api/uploads/
+  download: https://github.expedia.biz/
+release:
+  ids:
+    - gol
+  draft: false
+  mode: keep-existing
+  header: |
+    ## GOL Release - ({{ .Date }})

@@ -1,0 +1,42 @@
+# This workflow runs when a new GH release is created. It will
+# run goreleaser which will build the binaries and attach them to the github release,
+# build and publish the docker images. Then it will call spinnaker to deploy the tag.
+name: publish
+
+on:
+  release:
+    types: [created]
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'github commit, branch, or tag'
+
+env:
+  RELEASE_DOCKER_REGISTRY: kumo-docker-release-local.artylab.expedia.biz
+
+jobs:
+  publish:
+    runs-on: eg-default
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      -
+        name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.20'
+      -
+        name: Run GoReleaser
+        id: run-goreleaser
+        uses: actions/goreleaser-action@v4
+        with:
+          distribution: goreleaser
+          version: latest
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.SA_GITHUB_TOKEN }}
