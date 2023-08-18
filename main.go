@@ -1,16 +1,20 @@
 package main
 
 import (
+	"fmt"
 	"github.com/faiface/pixel"
 	"github.com/faiface/pixel/pixelgl"
 	"github.com/faiface/pixel/text"
+	"github.com/golang/freetype/truetype"
 	"github.expedia.biz/jarwallace/gol/internal/display"
 	"github.expedia.biz/jarwallace/gol/internal/models"
 	"github.expedia.biz/jarwallace/gol/internal/processor"
 	"golang.org/x/image/colornames"
-	"golang.org/x/image/font/basicfont"
+	"golang.org/x/image/font"
 	_ "image/png"
+	"io"
 	"math/rand"
+	"os"
 	"time"
 )
 
@@ -38,15 +42,16 @@ func run() {
 	if err != nil {
 		panic(err)
 	}
-	atlas := text.NewAtlas(
-		basicfont.Face7x13,
-		[]rune{'x'},
-	)
+	face, err := loadTTF("Consolas.ttf", 14)
+	if err != nil {
+		panic(err)
+	}
+	atlas := text.NewAtlas(face, text.ASCII)
 
-	//currGen := getInitial(winXMax, winYMax)
 	currGen := models.InjectRPentomino()
 	pr := processor.NewProcessor(winXMax, winYMax)
 	clicks := 0
+	generation := 0
 	for !win.Closed() {
 		if win.JustPressed(pixelgl.MouseButtonLeft) {
 			switch clicks % 4 {
@@ -59,6 +64,7 @@ func run() {
 			case 3:
 				currGen = models.InjectRPentomino()
 			}
+			generation = 0
 			clicks++
 		}
 		win.Clear(colornames.Black)
@@ -69,6 +75,10 @@ func run() {
 			break // Exit the loop if there are no alive cells
 		}
 		currGen = pr.AnalyzePopEfficiently(currGen)
+		txt := text.New(pixel.V(10, l-40), atlas) // This places the text near the top-left corner. Adjust as necessary.
+		fmt.Fprintf(txt, "Generation: %d", generation)
+		txt.Draw(win, pixel.IM.Scaled(txt.Orig, 1))
+		generation++
 		win.Update()
 	}
 }
@@ -92,7 +102,7 @@ func drawPop(atlas *text.Atlas, win *pixelgl.Window, pop map[models.Point]models
 		t.Color = cell.Color
 		t.Dot = pixel.V(float64(point.X*10), float64(point.Y*10))
 		_, _ = t.WriteString("x")
-		t.Draw(win, pixel.IM.Scaled(t.Orig, 1))
+		t.Draw(win, pixel.IM)
 	}
 }
 
@@ -117,14 +127,25 @@ func getInitial(winXMax, winYMax int) map[models.Point]models.Cell {
 	}
 	return res
 }
-func getNeighborCount(p models.Point, pop map[models.Point]models.Cell) int {
-	count := 0
-	offsets := []models.Point{{X: -1, Y: 0}, {X: 1, Y: 0}, {X: 0, Y: -1}, {X: 0, Y: 1}, {X: -1, Y: -1}, {X: 1, Y: -1}, {X: -1, Y: 1}, {X: 1, Y: 1}}
-	for _, offset := range offsets {
-		neighbor := models.Point{X: p.X + offset.X, Y: p.Y + offset.Y}
-		if pop[neighbor].Alive {
-			count++
-		}
+
+func loadTTF(path string, size float64) (font.Face, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
 	}
-	return count
+	defer file.Close()
+
+	ttfBytes, err := io.ReadAll(file)
+	if err != nil {
+		return nil, err
+	}
+
+	ttfFont, err := truetype.Parse(ttfBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return truetype.NewFace(ttfFont, &truetype.Options{
+		Size: size,
+	}), nil
 }
