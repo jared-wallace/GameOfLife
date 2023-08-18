@@ -92,7 +92,7 @@ func drawPop(atlas *text.Atlas, win *pixelgl.Window, pop map[models.Point]models
 		t.Clear()
 		t.Color = cell.Color
 		t.Dot = pixel.V(float64(point.X*10), float64(point.Y*10))
-		_, _ = t.WriteString("x")
+		_, _ = t.WriteString("*")
 		t.Draw(win, pixel.IM)
 	}
 }
