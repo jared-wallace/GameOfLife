@@ -18,7 +18,7 @@ func main() {
 	// Set initial window size based on grid size and cell size
 	ebiten.SetWindowSize(initialGridWidth*game.GetCellSize(), initialGridHeight*game.GetCellSize())
 	ebiten.SetWindowTitle("Conway's Game of Life")
-
+	ebiten.SetTPS(30)
 	// Run the game
 	if err := ebiten.RunGame(game); err != nil {
 		panic(err)

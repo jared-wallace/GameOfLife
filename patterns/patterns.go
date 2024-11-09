@@ -22,6 +22,11 @@ func NewPatternGenerator(height, width int) *PatternGenerator {
 	pg.patterns = append(pg.patterns, BeaconConfig)
 	pg.patterns = append(pg.patterns, LWSSConfig)
 	pg.patterns = append(pg.patterns, PulsarConfig)
+	pg.patterns = append(pg.patterns, MiddleweightSpaceshipConfig)
+	pg.patterns = append(pg.patterns, HeavyweightSpaceshipConfig)
+	pg.patterns = append(pg.patterns, TwinBeesShuttleConfig)
+	pg.patterns = append(pg.patterns, QueenBeeShuttleConfig)
+	pg.patterns = append(pg.patterns, CordershipGunConfig)
 
 	pg.height = height
 	pg.width = width
@@ -68,14 +73,13 @@ func randomColor() color.RGBA {
 }
 
 // setAliveCells sets the specified cells to alive and assigns them random colors.
-func setAliveCells(cells [][]bool, colors [][]color.RGBA, positions [][2]int, offsetX, offsetY int) {
+func setAliveCells(cells [][]bool, colors [][]color.RGBA, positions [][2]int, offsetX, offsetY int, width, height int) {
 	for _, pos := range positions {
-		x := pos[0] + offsetX
-		y := pos[1] + offsetY
-		if y >= 0 && y < len(cells) && x >= 0 && x < len(cells[0]) {
-			cells[y][x] = true
-			colors[y][x] = randomColor()
-		}
+		x := (pos[0] + offsetX + width) % width
+		y := (pos[1] + offsetY + height) % height
+
+		cells[y][x] = true
+		colors[y][x] = randomColor()
 	}
 }
 
@@ -104,7 +108,7 @@ func GliderConfig(height, width int) ([][]bool, [][]color.RGBA, string) {
 		{2, 1},
 		{2, 2},
 	}
-	setAliveCells(cells, colors, glider[:], midX, midY)
+	setAliveCells(cells, colors, glider[:], midX, midY, width, height)
 	return cells, colors, "glider"
 }
 
@@ -120,7 +124,7 @@ func GunConfig(height, width int) ([][]bool, [][]color.RGBA, string) {
 		{3, 35}, {4, 35}, {3, 36}, {4, 36},
 	}
 	offsetX, offsetY := width/2-18, height/2-9
-	setAliveCells(cells, colors, gunPattern[:], offsetX, offsetY)
+	setAliveCells(cells, colors, gunPattern[:], offsetX, offsetY, width, height)
 	return cells, colors, "gosper gun"
 }
 
@@ -134,7 +138,7 @@ func BlockConfig(height, width int) ([][]bool, [][]color.RGBA, string) {
 		{1, 0},
 		{1, 1},
 	}
-	setAliveCells(cells, colors, block[:], midX, midY)
+	setAliveCells(cells, colors, block[:], midX, midY, width, height)
 	return cells, colors, "block"
 }
 
@@ -147,7 +151,7 @@ func BlinkerConfig(height, width int) ([][]bool, [][]color.RGBA, string) {
 		{0, 0},
 		{1, 0},
 	}
-	setAliveCells(cells, colors, blinker[:], midX, midY)
+	setAliveCells(cells, colors, blinker[:], midX, midY, width, height)
 	return cells, colors, "blinker"
 }
 
@@ -163,7 +167,7 @@ func ToadConfig(height, width int) ([][]bool, [][]color.RGBA, string) {
 		{0, 0},
 		{1, 0},
 	}
-	setAliveCells(cells, colors, toad[:], midX, midY)
+	setAliveCells(cells, colors, toad[:], midX, midY, width, height)
 	return cells, colors, "toad"
 }
 
@@ -176,7 +180,7 @@ func BeaconConfig(height, width int) ([][]bool, [][]color.RGBA, string) {
 		{2, 2}, {3, 2},
 		{3, 3},
 	}
-	setAliveCells(cells, colors, beacon[:], midX, midY)
+	setAliveCells(cells, colors, beacon[:], midX, midY, width, height)
 	return cells, colors, "beacon"
 }
 
@@ -190,7 +194,7 @@ func LWSSConfig(height, width int) ([][]bool, [][]color.RGBA, string) {
 		{4, 2},
 		{0, 3}, {1, 3}, {2, 3}, {3, 3},
 	}
-	setAliveCells(cells, colors, lwss[:], midX, midY)
+	setAliveCells(cells, colors, lwss[:], midX, midY, width, height)
 	return cells, colors, "lightweight space ship"
 }
 
@@ -211,6 +215,80 @@ func PulsarConfig(height, width int) ([][]bool, [][]color.RGBA, string) {
 		{-3, -4}, {3, -4}, {-3, 4}, {3, 4},
 		{-4, -2}, {4, -2}, {-4, 2}, {4, 2},
 	}
-	setAliveCells(cells, colors, pulsar[:], midX, midY)
+	setAliveCells(cells, colors, pulsar[:], midX, midY, width, height)
 	return cells, colors, "pulsar"
+}
+
+func MiddleweightSpaceshipConfig(height, width int) ([][]bool, [][]color.RGBA, string) {
+	cells, colors := initializeBoard(height, width)
+	midX, midY := width/2, height/2
+	mwss := [9][2]int{
+		{1, 0}, {4, 0},
+		{0, 1}, {4, 1},
+		{4, 2},
+		{0, 3}, {3, 3}, {4, 3}, {5, 3},
+	}
+	setAliveCells(cells, colors, mwss[:], midX, midY, width, height)
+	return cells, colors, "middleweight spaceship"
+}
+
+func HeavyweightSpaceshipConfig(height, width int) ([][]bool, [][]color.RGBA, string) {
+	cells, colors := initializeBoard(height, width)
+	midX, midY := width/2, height/2
+	hwss := [13][2]int{
+		{1, 0}, {5, 0},
+		{0, 1}, {5, 1},
+		{5, 2},
+		{0, 3}, {5, 3},
+		{0, 4}, {5, 4},
+		{0, 5}, {5, 5},
+		{1, 6}, {5, 6},
+	}
+	setAliveCells(cells, colors, hwss[:], midX, midY, width, height)
+	return cells, colors, "heavyweight spaceship"
+}
+
+func TwinBeesShuttleConfig(height, width int) ([][]bool, [][]color.RGBA, string) {
+	cells, colors := initializeBoard(height, width)
+	midX, midY := width/2, height/2
+	twinBeesShuttle := [12][2]int{
+		{1, 0}, {2, 0}, {3, 0},
+		{0, 1}, {4, 1},
+		{4, 2},
+		{3, 3}, {4, 3}, {0, 4},
+		{1, 4}, {2, 4}, {3, 4},
+	}
+	setAliveCells(cells, colors, twinBeesShuttle[:], midX, midY, width, height)
+	return cells, colors, "twin bees shuttle"
+}
+
+func QueenBeeShuttleConfig(height, width int) ([][]bool, [][]color.RGBA, string) {
+	cells, colors := initializeBoard(height, width)
+	midX, midY := width/2, height/2
+	queenBeeShuttle := [10][2]int{
+		{1, 0}, {2, 0}, {3, 0},
+		{0, 1}, {4, 1},
+		{4, 2},
+		{3, 3}, {4, 3},
+		{0, 4}, {4, 4},
+	}
+	setAliveCells(cells, colors, queenBeeShuttle[:], midX, midY, width, height)
+	return cells, colors, "queen bee shuttle"
+}
+
+func CordershipGunConfig(height, width int) ([][]bool, [][]color.RGBA, string) {
+	cells, colors := initializeBoard(height, width)
+	midX, midY := width/2, height/2
+	cordershipGun := [28][2]int{
+		{18, 0}, {19, 0},
+		{1, 1}, {2, 1}, {18, 1}, {20, 1}, {28, 1}, {29, 1},
+		{1, 2}, {2, 2}, {20, 2}, {28, 2}, {29, 2},
+		{18, 3}, {19, 3}, {20, 3},
+		{18, 7}, {19, 7}, {20, 7},
+		{1, 8}, {2, 8}, {20, 8},
+		{1, 9}, {2, 9}, {18, 9}, {20, 9},
+		{18, 10}, {19, 10},
+	}
+	setAliveCells(cells, colors, cordershipGun[:], midX, midY, width, height)
+	return cells, colors, "cordership gun"
 }

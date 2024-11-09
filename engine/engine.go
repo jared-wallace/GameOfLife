@@ -67,18 +67,15 @@ func (g *Game) GetCellSize() int {
 func (g *Game) countAliveNeighbors(x, y int) int {
 	count := 0
 	for dy := -1; dy <= 1; dy++ {
-		ny := y + dy
-		if ny < 0 || ny >= g.height {
-			continue
-		}
 		for dx := -1; dx <= 1; dx++ {
-			nx := x + dx
-			if nx < 0 || nx >= g.width {
-				continue
-			}
 			if dx == 0 && dy == 0 {
-				continue
+				continue // Skip the cell itself
 			}
+
+			// Wrap around the edges using modulo arithmetic
+			nx := (x + dx + g.width) % g.width
+			ny := (y + dy + g.height) % g.height
+
 			if g.cells[ny][nx] {
 				count++
 			}
