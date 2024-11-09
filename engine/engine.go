@@ -7,6 +7,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/vector"
 	"github.com/jared-wallace/gol/patterns"
 	"image/color"
+	"log"
 	"math/rand"
 	"sync"
 )
@@ -50,11 +51,16 @@ func NewGame(width, height int) *Game {
 		colors:           colors,
 		nextCells:        nextCells,
 		generation:       0,
+		configIndex:      0,
 		patternGenerator: patterns.NewPatternGenerator(height, width),
-		cellSize:         4, // Default cell size
+		cellSize:         8, // Default cell size
 	}
 
-	g.cells, g.colors, g.name = patterns.RandomConfig(g.height, g.width)
+	var err error
+	g.cells, g.colors, g.name, err = g.patternGenerator.GetConfig(0)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	return g
 }
@@ -87,10 +93,14 @@ func (g *Game) countAliveNeighbors(x, y int) int {
 // Update is called every tick (1/60 [s] by default).
 func (g *Game) Update() error {
 	// Handle input: spacebar to switch configurations
+	var err error
 	currentSpacePressed := ebiten.IsKeyPressed(ebiten.KeySpace)
 	if currentSpacePressed && !g.prevSpacePressed {
 		g.configIndex = (g.configIndex + 1) % g.patternGenerator.GetPatternCount()
-		g.cells, g.colors, g.name = g.patternGenerator.GetConfig(g.configIndex)
+		g.cells, g.colors, g.name, err = g.patternGenerator.GetConfig(g.configIndex)
+		if err != nil {
+			log.Fatal(err)
+		}
 		g.generation = 0
 	}
 	g.prevSpacePressed = currentSpacePressed
@@ -255,4 +265,10 @@ func (g *Game) resizeGrid(newWidth, newHeight int) {
 	g.width = newWidth
 	g.height = newHeight
 	g.patternGenerator.SetHW(newHeight, newWidth)
+	// Reload the current pattern after resizing
+	var err error
+	g.cells, g.colors, g.name, err = g.patternGenerator.GetConfig(g.configIndex)
+	if err != nil {
+		log.Fatal(err)
+	}
 }

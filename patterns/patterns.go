@@ -1,49 +1,145 @@
 package patterns
 
 import (
+	"fmt"
 	"image/color"
+	"log"
 	"math/rand"
+	"os"
+	"sort"
+	"strings"
+
+	"github.com/jared-wallace/gol/pkg/PatternParser"
 )
 
+// Coordinate represents the position of a live cell
+type Coordinate struct {
+	X int
+	Y int
+}
+
+// PatternGenerator manages available patterns
 type PatternGenerator struct {
-	patterns []func(int, int) ([][]bool, [][]color.RGBA, string)
+	patterns []string
 	height   int
 	width    int
 }
 
+// NewPatternGenerator initializes the PatternGenerator by loading all patterns from the patterns/ directory
 func NewPatternGenerator(height, width int) *PatternGenerator {
-	pg := PatternGenerator{}
-	pg.patterns = append(pg.patterns, RandomConfig)
-	pg.patterns = append(pg.patterns, GliderConfig)
-	pg.patterns = append(pg.patterns, GunConfig)
-	pg.patterns = append(pg.patterns, BlockConfig)
-	pg.patterns = append(pg.patterns, BlinkerConfig)
-	pg.patterns = append(pg.patterns, ToadConfig)
-	pg.patterns = append(pg.patterns, BeaconConfig)
-	pg.patterns = append(pg.patterns, LWSSConfig)
-	pg.patterns = append(pg.patterns, PulsarConfig)
-	pg.patterns = append(pg.patterns, MiddleweightSpaceshipConfig)
-	pg.patterns = append(pg.patterns, HeavyweightSpaceshipConfig)
-	pg.patterns = append(pg.patterns, TwinBeesShuttleConfig)
-	pg.patterns = append(pg.patterns, QueenBeeShuttleConfig)
-	pg.patterns = append(pg.patterns, CordershipGunConfig)
+	pg := &PatternGenerator{
+		height: height,
+		width:  width,
+	}
 
-	pg.height = height
-	pg.width = width
-	return &pg
+	// Load all pattern names from the patterns directory
+	patternNames, err := loadPatternNames("patterns")
+	if err != nil {
+		log.Fatalf("Failed to load patterns: %v", err)
+	}
+
+	pg.patterns = append([]string{"random"}, patternNames...)
+	return pg
 }
 
-func (pg *PatternGenerator) GetConfig(idx int) ([][]bool, [][]color.RGBA, string) {
-	return pg.patterns[idx](pg.height, pg.width)
+// loadPatternNames scans the directory and returns a list of pattern names (without extension)
+func loadPatternNames(dir string) ([]string, error) {
+	files, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read patterns directory: %v", err)
+	}
+
+	var patternNames []string
+	for _, file := range files {
+		if !file.IsDir() && (strings.HasSuffix(file.Name(), ".txt") || strings.HasSuffix(file.Name(), ".rle")) {
+			name := strings.TrimSuffix(file.Name(), ".txt")
+			name = strings.TrimSuffix(name, ".rle")
+			patternNames = append(patternNames, name)
+		}
+	}
+	sort.Strings(patternNames)
+
+	return patternNames, nil
 }
 
+func RandomConfig(height, width int) ([][]bool, [][]color.RGBA, string) {
+	cells, colors := initializeBoard(height, width)
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			if rand.Float64() < 0.2 { // 20% chance to be alive
+				cells[y][x] = true
+				colors[y][x] = randomColor()
+			}
+		}
+	}
+	return cells, colors, "random"
+}
+
+// GetConfig loads the specified pattern by index
+func (pg *PatternGenerator) GetConfig(idx int) ([][]bool, [][]color.RGBA, string, error) {
+	if idx < 0 || idx >= len(pg.patterns) {
+		return nil, nil, "", fmt.Errorf("pattern index %d out of range", idx)
+	}
+	if idx == 0 {
+		// Return random configuration
+		cells, colors, name := RandomConfig(pg.height, pg.width)
+		return cells, colors, name, nil
+	}
+
+	patternName := pg.patterns[idx]
+	return LoadPatternConfig(pg.height, pg.width, patternName)
+}
+
+// GetPatternCount returns the number of available patterns
 func (pg *PatternGenerator) GetPatternCount() int {
 	return len(pg.patterns)
 }
 
+// SetHW sets the height and width of the board
 func (pg *PatternGenerator) SetHW(height int, width int) {
 	pg.height = height
 	pg.width = width
+}
+
+func LoadPatternConfig(height, width int, patternName string) ([][]bool, [][]color.RGBA, string, error) {
+	cells, colors := initializeBoard(height, width)
+	midX, midY := width/2, height/2
+
+	// Try to open .txt file first, if not found, try .rle
+	var filePath string
+	if _, err := os.Stat(fmt.Sprintf("patterns/%s.txt", patternName)); err == nil {
+		filePath = fmt.Sprintf("patterns/%s.txt", patternName)
+	} else if _, err := os.Stat(fmt.Sprintf("patterns/%s.rle", patternName)); err == nil {
+		filePath = fmt.Sprintf("patterns/%s.rle", patternName)
+	} else {
+		return nil, nil, "", fmt.Errorf("pattern file for '%s' not found", patternName)
+	}
+
+	var coordinates []PatternParser.Coordinate
+	var err error
+	if strings.HasSuffix(filePath, ".txt") {
+		// Read and parse the plaintext pattern file
+		coordinates, err = PatternParser.ReadPatternFromFile(filePath)
+		if err != nil {
+			return nil, nil, "", fmt.Errorf("failed to read pattern '%s': %v", patternName, err)
+		}
+	} else if strings.HasSuffix(filePath, ".rle") {
+		// Read and parse the RLE pattern file
+		coordinates, _, _, err = PatternParser.ReadRLEPatternFromFile(filePath)
+		if err != nil {
+			return nil, nil, "", fmt.Errorf("failed to read RLE pattern '%s': %v", patternName, err)
+		}
+	} else {
+		return nil, nil, "", fmt.Errorf("unknown file extension for pattern '%s'", patternName)
+	}
+
+	// Convert to [][2]int
+	coordPairs := PatternParser.ParsePattern(coordinates)
+
+	// Set the alive cells on the board
+	setAliveCells(cells, colors, coordPairs, midX, midY, width, height)
+
+	return cells, colors, patternName, nil
 }
 
 // initializeBoard creates a new board with all cells dead and colors set to default.
@@ -81,214 +177,4 @@ func setAliveCells(cells [][]bool, colors [][]color.RGBA, positions [][2]int, of
 		cells[y][x] = true
 		colors[y][x] = randomColor()
 	}
-}
-
-// RandomConfig initializes the board with a random configuration.
-func RandomConfig(height, width int) ([][]bool, [][]color.RGBA, string) {
-	cells, colors := initializeBoard(height, width)
-	for y := 0; y < height; y++ {
-		for x := 0; x < width; x++ {
-			if rand.Float64() < 0.2 { // 20% chance to be alive
-				cells[y][x] = true
-				colors[y][x] = randomColor()
-			}
-		}
-	}
-	return cells, colors, "random"
-}
-
-// GliderConfig places a glider pattern in the center of the board.
-func GliderConfig(height, width int) ([][]bool, [][]color.RGBA, string) {
-	cells, colors := initializeBoard(height, width)
-	midX, midY := width/2, height/2
-	glider := [5][2]int{
-		{0, 1},
-		{1, 2},
-		{2, 0},
-		{2, 1},
-		{2, 2},
-	}
-	setAliveCells(cells, colors, glider[:], midX, midY, width, height)
-	return cells, colors, "glider"
-}
-
-// GunConfig places the Gosper Glider Gun pattern in the center of the board.
-func GunConfig(height, width int) ([][]bool, [][]color.RGBA, string) {
-	cells, colors := initializeBoard(height, width)
-	gunPattern := [36][2]int{
-		{5, 1}, {5, 2}, {6, 1}, {6, 2},
-		{5, 11}, {6, 11}, {7, 11}, {4, 12}, {8, 12}, {3, 13}, {9, 13},
-		{3, 14}, {9, 14}, {6, 15}, {4, 16}, {8, 16}, {5, 17}, {6, 17},
-		{7, 17}, {6, 18}, {3, 21}, {4, 21}, {5, 21}, {3, 22}, {4, 22},
-		{5, 22}, {2, 23}, {6, 23}, {1, 25}, {2, 25}, {6, 25}, {7, 25},
-		{3, 35}, {4, 35}, {3, 36}, {4, 36},
-	}
-	offsetX, offsetY := width/2-18, height/2-9
-	setAliveCells(cells, colors, gunPattern[:], offsetX, offsetY, width, height)
-	return cells, colors, "gosper gun"
-}
-
-// BlockConfig places a 2x2 block pattern in the center of the board.
-func BlockConfig(height, width int) ([][]bool, [][]color.RGBA, string) {
-	cells, colors := initializeBoard(height, width)
-	midX, midY := width/2, height/2
-	block := [4][2]int{
-		{0, 0},
-		{0, 1},
-		{1, 0},
-		{1, 1},
-	}
-	setAliveCells(cells, colors, block[:], midX, midY, width, height)
-	return cells, colors, "block"
-}
-
-// BlinkerConfig places a blinker (horizontal line) in the center of the board.
-func BlinkerConfig(height, width int) ([][]bool, [][]color.RGBA, string) {
-	cells, colors := initializeBoard(height, width)
-	midX, midY := width/2, height/2
-	blinker := [3][2]int{
-		{-1, 0},
-		{0, 0},
-		{1, 0},
-	}
-	setAliveCells(cells, colors, blinker[:], midX, midY, width, height)
-	return cells, colors, "blinker"
-}
-
-// ToadConfig places an oscillator in the center of the board
-func ToadConfig(height, width int) ([][]bool, [][]color.RGBA, string) {
-	cells, colors := initializeBoard(height, width)
-	midX, midY := width/2, height/2
-	toad := [6][2]int{
-		{0, -1},
-		{1, -1},
-		{2, -1},
-		{-1, 0},
-		{0, 0},
-		{1, 0},
-	}
-	setAliveCells(cells, colors, toad[:], midX, midY, width, height)
-	return cells, colors, "toad"
-}
-
-func BeaconConfig(height, width int) ([][]bool, [][]color.RGBA, string) {
-	cells, colors := initializeBoard(height, width)
-	midX, midY := width/2, height/2
-	beacon := [6][2]int{
-		{0, 0}, {1, 0},
-		{0, 1},
-		{2, 2}, {3, 2},
-		{3, 3},
-	}
-	setAliveCells(cells, colors, beacon[:], midX, midY, width, height)
-	return cells, colors, "beacon"
-}
-
-func LWSSConfig(height, width int) ([][]bool, [][]color.RGBA, string) {
-	cells, colors := initializeBoard(height, width)
-	midX := width/2 - 2
-	midY := height/2 - 1
-	lwss := [9][2]int{
-		{1, 0}, {4, 0},
-		{0, 1}, {4, 1},
-		{4, 2},
-		{0, 3}, {1, 3}, {2, 3}, {3, 3},
-	}
-	setAliveCells(cells, colors, lwss[:], midX, midY, width, height)
-	return cells, colors, "lightweight space ship"
-}
-
-func PulsarConfig(height, width int) ([][]bool, [][]color.RGBA, string) {
-	cells, colors := initializeBoard(height, width)
-	midX, midY := width/2, height/2
-	pulsar := [48][2]int{
-		{-4, -2}, {-4, -1}, {-4, 1}, {-4, 2},
-		{-2, -4}, {-1, -4}, {1, -4}, {2, -4},
-		{-3, -2}, {-3, 2}, {3, -2}, {3, 2},
-		{-2, -3}, {-1, -3}, {1, -3}, {2, -3},
-		{-2, 3}, {-1, 3}, {1, 3}, {2, 3},
-		{-3, -1}, {-3, 1}, {3, -1}, {3, 1},
-		{-1, -2}, {-1, 2}, {1, -2}, {1, 2},
-		{-2, -1}, {-2, 1}, {2, -1}, {2, 1},
-		{-1, -4}, {1, -4}, {-1, 4}, {1, 4},
-		{-4, -3}, {-4, 3}, {4, -3}, {4, 3},
-		{-3, -4}, {3, -4}, {-3, 4}, {3, 4},
-		{-4, -2}, {4, -2}, {-4, 2}, {4, 2},
-	}
-	setAliveCells(cells, colors, pulsar[:], midX, midY, width, height)
-	return cells, colors, "pulsar"
-}
-
-func MiddleweightSpaceshipConfig(height, width int) ([][]bool, [][]color.RGBA, string) {
-	cells, colors := initializeBoard(height, width)
-	midX, midY := width/2, height/2
-	mwss := [9][2]int{
-		{1, 0}, {4, 0},
-		{0, 1}, {4, 1},
-		{4, 2},
-		{0, 3}, {3, 3}, {4, 3}, {5, 3},
-	}
-	setAliveCells(cells, colors, mwss[:], midX, midY, width, height)
-	return cells, colors, "middleweight spaceship"
-}
-
-func HeavyweightSpaceshipConfig(height, width int) ([][]bool, [][]color.RGBA, string) {
-	cells, colors := initializeBoard(height, width)
-	midX, midY := width/2, height/2
-	hwss := [13][2]int{
-		{1, 0}, {5, 0},
-		{0, 1}, {5, 1},
-		{5, 2},
-		{0, 3}, {5, 3},
-		{0, 4}, {5, 4},
-		{0, 5}, {5, 5},
-		{1, 6}, {5, 6},
-	}
-	setAliveCells(cells, colors, hwss[:], midX, midY, width, height)
-	return cells, colors, "heavyweight spaceship"
-}
-
-func TwinBeesShuttleConfig(height, width int) ([][]bool, [][]color.RGBA, string) {
-	cells, colors := initializeBoard(height, width)
-	midX, midY := width/2, height/2
-	twinBeesShuttle := [12][2]int{
-		{1, 0}, {2, 0}, {3, 0},
-		{0, 1}, {4, 1},
-		{4, 2},
-		{3, 3}, {4, 3}, {0, 4},
-		{1, 4}, {2, 4}, {3, 4},
-	}
-	setAliveCells(cells, colors, twinBeesShuttle[:], midX, midY, width, height)
-	return cells, colors, "twin bees shuttle"
-}
-
-func QueenBeeShuttleConfig(height, width int) ([][]bool, [][]color.RGBA, string) {
-	cells, colors := initializeBoard(height, width)
-	midX, midY := width/2, height/2
-	queenBeeShuttle := [10][2]int{
-		{1, 0}, {2, 0}, {3, 0},
-		{0, 1}, {4, 1},
-		{4, 2},
-		{3, 3}, {4, 3},
-		{0, 4}, {4, 4},
-	}
-	setAliveCells(cells, colors, queenBeeShuttle[:], midX, midY, width, height)
-	return cells, colors, "queen bee shuttle"
-}
-
-func CordershipGunConfig(height, width int) ([][]bool, [][]color.RGBA, string) {
-	cells, colors := initializeBoard(height, width)
-	midX, midY := width/2, height/2
-	cordershipGun := [28][2]int{
-		{18, 0}, {19, 0},
-		{1, 1}, {2, 1}, {18, 1}, {20, 1}, {28, 1}, {29, 1},
-		{1, 2}, {2, 2}, {20, 2}, {28, 2}, {29, 2},
-		{18, 3}, {19, 3}, {20, 3},
-		{18, 7}, {19, 7}, {20, 7},
-		{1, 8}, {2, 8}, {20, 8},
-		{1, 9}, {2, 9}, {18, 9}, {20, 9},
-		{18, 10}, {19, 10},
-	}
-	setAliveCells(cells, colors, cordershipGun[:], midX, midY, width, height)
-	return cells, colors, "cordership gun"
 }
