@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
+	"github.com/hajimehoshi/ebiten/v2/vector"
 	"image/color"
 	"math/rand"
 	"sync"
@@ -16,6 +17,7 @@ type Game struct {
 	colors        [][]color.RGBA
 	nextCells     [][]bool
 	configIndex   int
+	generation    int
 
 	// Fields for cell size management
 	cellSize      int
@@ -39,12 +41,13 @@ func NewGame(width, height int) *Game {
 	}
 
 	g := &Game{
-		width:     width,
-		height:    height,
-		cells:     cells,
-		colors:    colors,
-		nextCells: nextCells,
-		cellSize:  4, // Default cell size
+		width:      width,
+		height:     height,
+		cells:      cells,
+		colors:     colors,
+		nextCells:  nextCells,
+		generation: 0,
+		cellSize:   4, // Default cell size
 	}
 
 	g.RandomConfig()
@@ -54,6 +57,7 @@ func NewGame(width, height int) *Game {
 
 // RandomConfig initializes the grid with a random configuration.
 func (g *Game) RandomConfig() {
+	g.generation = 0
 	for y := 0; y < g.height; y++ {
 		for x := 0; x < g.width; x++ {
 			alive := rand.Float64() < 0.2 // 20% chance to be alive
@@ -67,7 +71,7 @@ func (g *Game) RandomConfig() {
 				}
 			} else {
 				// Reset color if cell is dead
-				g.colors[y][x] = color.RGBA{0, 0, 0, 255}
+				g.colors[y][x] = color.RGBA{A: 255}
 			}
 		}
 	}
@@ -79,9 +83,10 @@ func (g *Game) GliderConfig() {
 	for y := 0; y < g.height; y++ {
 		for x := 0; x < g.width; x++ {
 			g.cells[y][x] = false
-			g.colors[y][x] = color.RGBA{0, 0, 0, 255}
+			g.colors[y][x] = color.RGBA{A: 255}
 		}
 	}
+	g.generation = 0
 	// Place a glider in the center
 	midX := g.width / 2
 	midY := g.height / 2
@@ -113,9 +118,10 @@ func (g *Game) GunConfig() {
 	for y := 0; y < g.height; y++ {
 		for x := 0; x < g.width; x++ {
 			g.cells[y][x] = false
-			g.colors[y][x] = color.RGBA{0, 0, 0, 255}
+			g.colors[y][x] = color.RGBA{A: 255}
 		}
 	}
+	g.generation = 0
 	// Coordinates for the Gosper Glider Gun
 	gunPattern := [36][2]int{
 		{5, 1}, {5, 2}, {6, 1}, {6, 2},
@@ -255,6 +261,8 @@ func (g *Game) Update() error {
 
 	// Swap cells and nextCells
 	g.cells, g.nextCells = g.nextCells, g.cells
+	// increment generation
+	g.generation++
 
 	return nil
 }
@@ -272,17 +280,19 @@ func (g *Game) Draw(screen *ebiten.Image) {
 				rectX := x * cellSize
 				rectY := y * cellSize
 				// Draw a filled rectangle for the cell
-				ebitenutil.DrawRect(screen, float64(rectX), float64(rectY), float64(cellSize), float64(cellSize), col)
+				//ebitenutil.DrawRect(screen, float64(rectX), float64(rectY), float64(cellSize), float64(cellSize), col)
+				vector.DrawFilledRect(screen, float32(rectX), float32(rectY), float32(cellSize), float32(cellSize), col, true)
 			}
 		}
 	}
 
 	// Display FPS and current configuration
 	info := fmt.Sprintf(
-		"FPS: %.2f\nConfig: %d/3\nCell Size: %d\nPress SPACE to change config\nPress '+'/'-' to adjust cell size",
+		"FPS: %.2f\nConfig: %d/3\nCell Size: %d\nGeneration: %d\nPress SPACE to change config\nPress '+'/'-' to adjust cell size",
 		ebiten.ActualFPS(),
 		g.configIndex+1,
 		g.cellSize,
+		g.generation,
 	)
 	ebitenutil.DebugPrint(screen, info)
 }
