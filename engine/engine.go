@@ -10,6 +10,7 @@ import (
 	"log"
 	"math/rand"
 	"sync"
+	"time"
 )
 
 // Game implements the ebiten.Game interface.
@@ -31,6 +32,13 @@ type Game struct {
 	prevSpacePressed bool
 	prevPlusPressed  bool
 	prevMinusPressed bool
+
+	// Fields for tick speed management
+	tickSpeed       float64    // Ticks per second
+	tickInterval    float64    // Seconds between ticks (1 / tickSpeed)
+	tickAccumulator float64    // Accumulated time
+	lastUpdateTime  time.Time  // Last update time
+	tickSpeedMutex  sync.Mutex // Mutex to protect tickSpeed fields
 }
 
 // NewGame initializes a new Game instance.
@@ -54,6 +62,12 @@ func NewGame(width, height int) *Game {
 		configIndex:      0,
 		patternGenerator: patterns.NewPatternGenerator(height, width),
 		cellSize:         8, // Default cell size
+
+		// Initialize tick speed fields
+		tickSpeed:       5.0, // Default 5 ticks per second
+		tickInterval:    1.0 / 5.0,
+		tickAccumulator: 0.0,
+		lastUpdateTime:  time.Now(),
 	}
 
 	var err error
@@ -90,8 +104,22 @@ func (g *Game) countAliveNeighbors(x, y int) int {
 	return count
 }
 
-// Update is called every tick (1/60 [s] by default).
+// Update is called every frame.
 func (g *Game) Update() error {
+	currentTime := time.Now()
+	g.tickSpeedMutex.Lock()
+	deltaTime := currentTime.Sub(g.lastUpdateTime).Seconds()
+	g.lastUpdateTime = currentTime
+	g.tickAccumulator += deltaTime
+
+	// Determine if it's time to perform a tick
+	for g.tickAccumulator >= g.tickInterval {
+		// Perform a game tick
+		g.performTick()
+		g.tickAccumulator -= g.tickInterval
+	}
+	g.tickSpeedMutex.Unlock()
+
 	// Handle input: spacebar to switch configurations
 	var err error
 	currentSpacePressed := ebiten.IsKeyPressed(ebiten.KeySpace)
@@ -129,6 +157,14 @@ func (g *Game) Update() error {
 	}
 	g.prevMinusPressed = currentMinusPressed
 
+	// Handle tick speed input
+	g.handleTickSpeedInput()
+
+	return nil
+}
+
+// performTick contains the logic to update the game state
+func (g *Game) performTick() {
 	// Create a wait group for concurrency
 	var wg sync.WaitGroup
 	numWorkers := 8
@@ -177,10 +213,33 @@ func (g *Game) Update() error {
 
 	// Swap cells and nextCells
 	g.cells, g.nextCells = g.nextCells, g.cells
-	// increment generation
+	// Increment generation
 	g.generation++
+}
 
-	return nil
+// handleTickSpeedInput manages user input to adjust tick speed
+func (g *Game) handleTickSpeedInput() {
+	// Handle input: Up arrow to increase tick speed
+	if ebiten.IsKeyPressed(ebiten.KeyArrowUp) {
+		g.tickSpeedMutex.Lock()
+		g.tickSpeed += 1.0
+		if g.tickSpeed > 60.0 { // Maximum tick speed limit
+			g.tickSpeed = 60.0
+		}
+		g.tickInterval = 1.0 / g.tickSpeed
+		g.tickSpeedMutex.Unlock()
+	}
+
+	// Handle input: Down arrow to decrease tick speed
+	if ebiten.IsKeyPressed(ebiten.KeyArrowDown) {
+		g.tickSpeedMutex.Lock()
+		g.tickSpeed -= 1.0
+		if g.tickSpeed < 1.0 { // Minimum tick speed limit
+			g.tickSpeed = 1.0
+		}
+		g.tickInterval = 1.0 / g.tickSpeed
+		g.tickSpeedMutex.Unlock()
+	}
 }
 
 // Draw renders the current state to the screen.
@@ -201,13 +260,18 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		}
 	}
 
-	// Display FPS and current configuration
+	// Display FPS, tick speed, and current configuration
+	g.tickSpeedMutex.Lock()
+	tickSpeed := g.tickSpeed
+	g.tickSpeedMutex.Unlock()
+
 	info := fmt.Sprintf(
-		"FPS: %.2f\nConfig: %s\nCell Size: %d\nGeneration: %d\nPress SPACE to change config\nPress '+'/'-' to adjust cell size",
+		"FPS: %.2f\nConfig: %s\nCell Size: %d\nGeneration: %d\nTick Speed: %.1f TPS\nPress SPACE to change config\nPress '+'/'-' to adjust cell size\nUse Up/Down arrows to adjust tick speed",
 		ebiten.ActualFPS(),
 		g.name,
 		g.cellSize,
 		g.generation,
+		tickSpeed,
 	)
 	ebitenutil.DebugPrint(screen, info)
 }
