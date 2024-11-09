@@ -189,7 +189,7 @@ func (g *Game) Update() error {
 		g.cellSizeMutex.Lock()
 		if g.cellSize < 20 { // Maximum cell size limit
 			g.cellSize++
-			g.resizeGrid(g.width, g.height)
+			// No direct call to resizeGrid here
 		}
 		g.cellSizeMutex.Unlock()
 	}
@@ -201,7 +201,7 @@ func (g *Game) Update() error {
 		g.cellSizeMutex.Lock()
 		if g.cellSize > 1 { // Minimum cell size limit
 			g.cellSize--
-			g.resizeGrid(g.width, g.height)
+			// No direct call to resizeGrid here
 		}
 		g.cellSizeMutex.Unlock()
 	}
@@ -289,13 +289,21 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 // Layout takes the outside size (e.g., the window size) and returns the (logical) screen size.
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
-	// Calculate grid dimensions based on cell size
 	g.cellSizeMutex.Lock()
 	cellSize := g.cellSize
 	g.cellSizeMutex.Unlock()
 
+	// Calculate grid dimensions based on cell size
 	gridWidth := outsideWidth / cellSize
 	gridHeight := outsideHeight / cellSize
+
+	// Ensure grid dimensions are at least 1x1
+	if gridWidth < 1 {
+		gridWidth = 1
+	}
+	if gridHeight < 1 {
+		gridHeight = 1
+	}
 
 	// If grid dimensions have changed, resize the grid
 	if gridWidth != g.width || gridHeight != g.height {
@@ -307,9 +315,6 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
 
 // resizeGrid adjusts the grid size based on the new grid dimensions and current cell size.
 func (g *Game) resizeGrid(newWidth, newHeight int) {
-	g.cellSizeMutex.Lock()
-	defer g.cellSizeMutex.Unlock()
-
 	// Create new slices with updated dimensions
 	newCells := make([][]bool, newHeight)
 	newColors := make([][]color.RGBA, newHeight)
@@ -346,6 +351,7 @@ func main() {
 
 	// Configure Ebiten window
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
+	// Set initial window size based on grid size and cell size
 	ebiten.SetWindowSize(initialGridWidth*game.cellSize, initialGridHeight*game.cellSize)
 	ebiten.SetWindowTitle("Conway's Game of Life")
 
