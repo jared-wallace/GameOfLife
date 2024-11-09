@@ -29,9 +29,12 @@ type Game struct {
 	cellSizeMutex sync.Mutex
 
 	// Fields for key state tracking
-	prevSpacePressed bool
-	prevPlusPressed  bool
-	prevMinusPressed bool
+	prevSpacePressed     bool
+	prevPlusPressed      bool
+	prevMinusPressed     bool
+	prevUpArrowPressed   bool
+	prevDownArrowPressed bool
+	prevEscPressed       bool
 
 	// Fields for tick speed management
 	tickSpeed       float64    // Ticks per second
@@ -157,6 +160,11 @@ func (g *Game) Update() error {
 	}
 	g.prevMinusPressed = currentMinusPressed
 
+	currentEscPressed := ebiten.IsKeyPressed(ebiten.KeyEscape)
+	if currentEscPressed && !g.prevEscPressed {
+		return ebiten.Termination
+	}
+
 	// Handle tick speed input
 	g.handleTickSpeedInput()
 
@@ -220,7 +228,8 @@ func (g *Game) performTick() {
 // handleTickSpeedInput manages user input to adjust tick speed
 func (g *Game) handleTickSpeedInput() {
 	// Handle input: Up arrow to increase tick speed
-	if ebiten.IsKeyPressed(ebiten.KeyArrowUp) {
+	currentUpKeyPressed := ebiten.IsKeyPressed(ebiten.KeyArrowUp)
+	if currentUpKeyPressed && !g.prevUpArrowPressed {
 		g.tickSpeedMutex.Lock()
 		g.tickSpeed += 1.0
 		if g.tickSpeed > 60.0 { // Maximum tick speed limit
@@ -229,9 +238,11 @@ func (g *Game) handleTickSpeedInput() {
 		g.tickInterval = 1.0 / g.tickSpeed
 		g.tickSpeedMutex.Unlock()
 	}
+	g.prevUpArrowPressed = currentUpKeyPressed
 
 	// Handle input: Down arrow to decrease tick speed
-	if ebiten.IsKeyPressed(ebiten.KeyArrowDown) {
+	currentDownKeyPressed := ebiten.IsKeyPressed(ebiten.KeyArrowDown)
+	if currentDownKeyPressed && !g.prevDownArrowPressed {
 		g.tickSpeedMutex.Lock()
 		g.tickSpeed -= 1.0
 		if g.tickSpeed < 1.0 { // Minimum tick speed limit
@@ -240,6 +251,7 @@ func (g *Game) handleTickSpeedInput() {
 		g.tickInterval = 1.0 / g.tickSpeed
 		g.tickSpeedMutex.Unlock()
 	}
+	g.prevDownArrowPressed = currentDownKeyPressed
 }
 
 // Draw renders the current state to the screen.
@@ -266,7 +278,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.tickSpeedMutex.Unlock()
 
 	info := fmt.Sprintf(
-		"FPS: %.2f\nConfig: %s\nCell Size: %d\nGeneration: %d\nTick Speed: %.1f TPS\nPress SPACE to change config\nPress '+'/'-' to adjust cell size\nUse Up/Down arrows to adjust tick speed",
+		"FPS: %.2f\nConfig: %s\nCell Size: %d\nGeneration: %d\nTick Speed: %.1f TPS\nPress SPACE to change config\nPress '+'/'-' to adjust cell size\nUse Up/Down arrows to adjust tick speed\nUse Escape to exit",
 		ebiten.ActualFPS(),
 		g.name,
 		g.cellSize,
