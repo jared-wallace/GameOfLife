@@ -9,14 +9,25 @@ import (
 	"sync"
 )
 
+// Game implements the ebiten.Game interface.
 type Game struct {
 	width, height int
 	cells         [][]bool
 	colors        [][]color.RGBA
 	nextCells     [][]bool
 	configIndex   int
+
+	// Fields for cell size management
+	cellSize      int
+	cellSizeMutex sync.Mutex
+
+	// Fields for key state tracking
+	prevSpacePressed bool
+	prevPlusPressed  bool
+	prevMinusPressed bool
 }
 
+// NewGame initializes a new Game instance.
 func NewGame(width, height int) *Game {
 	cells := make([][]bool, height)
 	colors := make([][]color.RGBA, height)
@@ -33,6 +44,7 @@ func NewGame(width, height int) *Game {
 		cells:     cells,
 		colors:    colors,
 		nextCells: nextCells,
+		cellSize:  4, // Default cell size
 	}
 
 	g.RandomConfig()
@@ -40,10 +52,11 @@ func NewGame(width, height int) *Game {
 	return g
 }
 
+// RandomConfig initializes the grid with a random configuration.
 func (g *Game) RandomConfig() {
 	for y := 0; y < g.height; y++ {
 		for x := 0; x < g.width; x++ {
-			alive := rand.Float64() < 0.5
+			alive := rand.Float64() < 0.2 // 20% chance to be alive
 			g.cells[y][x] = alive
 			if alive {
 				g.colors[y][x] = color.RGBA{
@@ -52,51 +65,59 @@ func (g *Game) RandomConfig() {
 					B: uint8(rand.Intn(256)),
 					A: 255,
 				}
+			} else {
+				// Reset color if cell is dead
+				g.colors[y][x] = color.RGBA{0, 0, 0, 255}
 			}
 		}
 	}
 }
 
+// GliderConfig initializes the grid with a glider pattern at the center.
 func (g *Game) GliderConfig() {
-	// Clear the cells
+	// Clear the cells and reset colors
 	for y := 0; y < g.height; y++ {
 		for x := 0; x < g.width; x++ {
 			g.cells[y][x] = false
+			g.colors[y][x] = color.RGBA{0, 0, 0, 255}
 		}
 	}
 	// Place a glider in the center
 	midX := g.width / 2
 	midY := g.height / 2
-	g.cells[midY][midX+1] = true
-	g.cells[midY+1][midX+2] = true
-	g.cells[midY+2][midX] = true
-	g.cells[midY+2][midX+1] = true
-	g.cells[midY+2][midX+2] = true
-	// Assign colors
-	for y := 0; y < g.height; y++ {
-		for x := 0; x < g.width; x++ {
-			if g.cells[y][x] {
-				g.colors[y][x] = color.RGBA{
-					R: uint8(rand.Intn(256)),
-					G: uint8(rand.Intn(256)),
-					B: uint8(rand.Intn(256)),
-					A: 255,
-				}
+	glider := [5][2]int{
+		{0, 1},
+		{1, 2},
+		{2, 0},
+		{2, 1},
+		{2, 2},
+	}
+	for _, pos := range glider {
+		x := midX + pos[0]
+		y := midY + pos[1]
+		if x >= 0 && x < g.width && y >= 0 && y < g.height {
+			g.cells[y][x] = true
+			g.colors[y][x] = color.RGBA{
+				R: uint8(rand.Intn(256)),
+				G: uint8(rand.Intn(256)),
+				B: uint8(rand.Intn(256)),
+				A: 255,
 			}
 		}
 	}
 }
 
+// GunConfig initializes the grid with a Gosper Glider Gun pattern at the center.
 func (g *Game) GunConfig() {
-	// Clear the cells
+	// Clear the cells and reset colors
 	for y := 0; y < g.height; y++ {
 		for x := 0; x < g.width; x++ {
 			g.cells[y][x] = false
+			g.colors[y][x] = color.RGBA{0, 0, 0, 255}
 		}
 	}
 	// Coordinates for the Gosper Glider Gun
-	// Relative positions
-	gunPattern := [][2]int{
+	gunPattern := [36][2]int{
 		{5, 1}, {5, 2}, {6, 1}, {6, 2},
 		{5, 11}, {6, 11}, {7, 11}, {4, 12}, {8, 12}, {3, 13}, {9, 13},
 		{3, 14}, {9, 14}, {6, 15}, {4, 16}, {8, 16}, {5, 17}, {6, 17},
@@ -121,15 +142,22 @@ func (g *Game) GunConfig() {
 	}
 }
 
+// countAliveNeighbors returns the number of alive neighbors for a cell at (x, y).
 func (g *Game) countAliveNeighbors(x, y int) int {
 	count := 0
 	for dy := -1; dy <= 1; dy++ {
+		ny := y + dy
+		if ny < 0 || ny >= g.height {
+			continue
+		}
 		for dx := -1; dx <= 1; dx++ {
+			nx := x + dx
+			if nx < 0 || nx >= g.width {
+				continue
+			}
 			if dx == 0 && dy == 0 {
 				continue
 			}
-			nx := (x + dx + g.width) % g.width
-			ny := (y + dy + g.height) % g.height
 			if g.cells[ny][nx] {
 				count++
 			}
@@ -138,10 +166,11 @@ func (g *Game) countAliveNeighbors(x, y int) int {
 	return count
 }
 
+// Update is called every tick (1/60 [s] by default).
 func (g *Game) Update() error {
-	// Handle input
-	if ebiten.IsKeyPressed(ebiten.KeySpace) {
-		// Switch configurations
+	// Handle input: spacebar to switch configurations
+	currentSpacePressed := ebiten.IsKeyPressed(ebiten.KeySpace)
+	if currentSpacePressed && !g.prevSpacePressed {
 		g.configIndex = (g.configIndex + 1) % 3
 		switch g.configIndex {
 		case 0:
@@ -151,8 +180,32 @@ func (g *Game) Update() error {
 		case 2:
 			g.GunConfig()
 		}
-		return nil
 	}
+	g.prevSpacePressed = currentSpacePressed
+
+	// Handle input: '+' to increase cell size
+	currentPlusPressed := ebiten.IsKeyPressed(ebiten.KeyEqual) || ebiten.IsKeyPressed(ebiten.KeyKPAdd)
+	if currentPlusPressed && !g.prevPlusPressed {
+		g.cellSizeMutex.Lock()
+		if g.cellSize < 20 { // Maximum cell size limit
+			g.cellSize++
+			g.resizeGrid(g.width, g.height)
+		}
+		g.cellSizeMutex.Unlock()
+	}
+	g.prevPlusPressed = currentPlusPressed
+
+	// Handle input: '-' to decrease cell size
+	currentMinusPressed := ebiten.IsKeyPressed(ebiten.KeyMinus) || ebiten.IsKeyPressed(ebiten.KeyKPSubtract)
+	if currentMinusPressed && !g.prevMinusPressed {
+		g.cellSizeMutex.Lock()
+		if g.cellSize > 1 { // Minimum cell size limit
+			g.cellSize--
+			g.resizeGrid(g.width, g.height)
+		}
+		g.cellSizeMutex.Unlock()
+	}
+	g.prevMinusPressed = currentMinusPressed
 
 	// Create a wait group for concurrency
 	var wg sync.WaitGroup
@@ -206,30 +259,58 @@ func (g *Game) Update() error {
 	return nil
 }
 
+// Draw renders the current state to the screen.
 func (g *Game) Draw(screen *ebiten.Image) {
+	g.cellSizeMutex.Lock()
+	cellSize := g.cellSize
+	g.cellSizeMutex.Unlock()
+
 	for y := 0; y < g.height; y++ {
 		for x := 0; x < g.width; x++ {
 			if g.cells[y][x] {
-				screen.Set(x, y, g.colors[y][x])
-			} else {
-				screen.Set(x, y, color.Black)
+				col := g.colors[y][x]
+				rectX := x * cellSize
+				rectY := y * cellSize
+				// Draw a filled rectangle for the cell
+				ebitenutil.DrawRect(screen, float64(rectX), float64(rectY), float64(cellSize), float64(cellSize), col)
 			}
 		}
 	}
-	ebitenutil.DebugPrint(screen, fmt.Sprintf("FPS: %0.2f\nConfig: %d", ebiten.ActualFPS(), g.configIndex))
+
+	// Display FPS and current configuration
+	info := fmt.Sprintf(
+		"FPS: %.2f\nConfig: %d/3\nCell Size: %d\nPress SPACE to change config\nPress '+'/'-' to adjust cell size",
+		ebiten.ActualFPS(),
+		g.configIndex+1,
+		g.cellSize,
+	)
+	ebitenutil.DebugPrint(screen, info)
 }
 
+// Layout takes the outside size (e.g., the window size) and returns the (logical) screen size.
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
-	// Adjust the grid size based on the window size
-	if outsideWidth != g.width || outsideHeight != g.height {
-		g.width = outsideWidth
-		g.height = outsideHeight
-		g.resizeGrid(g.width, g.height)
+	// Calculate grid dimensions based on cell size
+	g.cellSizeMutex.Lock()
+	cellSize := g.cellSize
+	g.cellSizeMutex.Unlock()
+
+	gridWidth := outsideWidth / cellSize
+	gridHeight := outsideHeight / cellSize
+
+	// If grid dimensions have changed, resize the grid
+	if gridWidth != g.width || gridHeight != g.height {
+		g.resizeGrid(gridWidth, gridHeight)
 	}
-	return g.width, g.height
+
+	return outsideWidth, outsideHeight
 }
 
+// resizeGrid adjusts the grid size based on the new grid dimensions and current cell size.
 func (g *Game) resizeGrid(newWidth, newHeight int) {
+	g.cellSizeMutex.Lock()
+	defer g.cellSizeMutex.Unlock()
+
+	// Create new slices with updated dimensions
 	newCells := make([][]bool, newHeight)
 	newColors := make([][]color.RGBA, newHeight)
 	newNextCells := make([][]bool, newHeight)
@@ -237,23 +318,38 @@ func (g *Game) resizeGrid(newWidth, newHeight int) {
 		newCells[y] = make([]bool, newWidth)
 		newColors[y] = make([]color.RGBA, newWidth)
 		newNextCells[y] = make([]bool, newWidth)
-		if y < len(g.cells) {
-			copy(newCells[y], g.cells[y])
-			copy(newColors[y], g.colors[y])
-			copy(newNextCells[y], g.nextCells[y])
+		// Copy existing data if within old bounds
+		if y < g.height {
+			for x := 0; x < newWidth && x < g.width; x++ {
+				newCells[y][x] = g.cells[y][x]
+				newColors[y][x] = g.colors[y][x]
+				newNextCells[y][x] = g.nextCells[y][x]
+			}
 		}
 	}
+
+	// Replace old slices with new ones
 	g.cells = newCells
 	g.colors = newColors
 	g.nextCells = newNextCells
+	g.width = newWidth
+	g.height = newHeight
 }
 
+// main initializes and runs the game.
 func main() {
-	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
-	ebiten.SetWindowTitle("Conway's Game of Life")
-	width, height := 1280, 1024
-	game := NewGame(width, height)
+	// Initial grid size
+	initialGridWidth, initialGridHeight := 320, 256 // Adjusted for better performance
 
+	// Create a new game instance
+	game := NewGame(initialGridWidth, initialGridHeight)
+
+	// Configure Ebiten window
+	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
+	ebiten.SetWindowSize(initialGridWidth*game.cellSize, initialGridHeight*game.cellSize)
+	ebiten.SetWindowTitle("Conway's Game of Life")
+
+	// Run the game
 	if err := ebiten.RunGame(game); err != nil {
 		panic(err)
 	}
