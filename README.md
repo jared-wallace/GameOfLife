@@ -69,8 +69,8 @@ Upon launching the application, you'll be greeted with a window displaying the c
 
 ### Controls
 
-Spacebar: Cycle through available patterns.
-'+' / '-': Increase or decrease the cell size for better visibility.
-Up Arrow: Increase the simulation tick speed (TPS - Ticks Per Second).
-Down Arrow: Decrease the simulation tick speed.
-Escape: Exit the application.
+  - Spacebar: Cycle through available patterns.
+  - '+' / '-': Increase or decrease the cell size for better visibility.
+  - Up Arrow: Increase the simulation tick speed (TPS - Ticks Per Second).
+  - Down Arrow: Decrease the simulation tick speed.
+  - Escape: Exit the application.
