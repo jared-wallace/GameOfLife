@@ -57,11 +57,11 @@ Clone the Repository:
 
 Build the Application:
 
-go build -o gameoflife
+`go build -o gameoflife`
 
 Run the Application:
 
-    ./gameoflife
+`./gameoflife`
 
 ## Usage
 
