@@ -53,7 +53,7 @@ Go Programming Language: Ensure you have Go installed. You can download it from 
 
 Clone the Repository:
 
-`git clone https://github.com/jared-wallace/gol.git`
+`git clone https://github.com/jared-wallace/GameOfLife.git`
 
 Build the Application:
 
