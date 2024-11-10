@@ -51,9 +51,10 @@ func loadPatternNames(dir string) ([]string, error) {
 
 	var patternNames []string
 	for _, file := range files {
-		if !file.IsDir() && (strings.HasSuffix(file.Name(), ".txt") || strings.HasSuffix(file.Name(), ".rle")) {
+		if !file.IsDir() && (strings.HasSuffix(file.Name(), ".txt") || strings.HasSuffix(file.Name(), ".rle") || strings.HasSuffix(file.Name(), ".mc")) {
 			name := strings.TrimSuffix(file.Name(), ".txt")
 			name = strings.TrimSuffix(name, ".rle")
+			name = strings.TrimSuffix(name, ".mc")
 			patternNames = append(patternNames, name)
 		}
 	}
@@ -111,6 +112,8 @@ func LoadPatternConfig(height, width int, patternName string) ([][]bool, [][]col
 		filePath = fmt.Sprintf("patterns/%s.txt", patternName)
 	} else if _, err := os.Stat(fmt.Sprintf("patterns/%s.rle", patternName)); err == nil {
 		filePath = fmt.Sprintf("patterns/%s.rle", patternName)
+	} else if _, err := os.Stat(fmt.Sprintf("patterns/%s.mc", patternName)); err == nil {
+		filePath = fmt.Sprintf("patterns/%s.mc", patternName)
 	} else {
 		return nil, nil, "", fmt.Errorf("pattern file for '%s' not found", patternName)
 	}
@@ -128,6 +131,12 @@ func LoadPatternConfig(height, width int, patternName string) ([][]bool, [][]col
 		coordinates, _, _, err = PatternParser.ReadRLEPatternFromFile(filePath)
 		if err != nil {
 			return nil, nil, "", fmt.Errorf("failed to read RLE pattern '%s': %v", patternName, err)
+		}
+	} else if strings.HasSuffix(filePath, ".mc") {
+		// Read and parse the MC pattern file
+		coordinates, _, _, err = PatternParser.ReadMCMacrocellFromFile(filePath)
+		if err != nil {
+			return nil, nil, "", fmt.Errorf("failed to read MC pattern '%s': %v", patternName, err)
 		}
 	} else {
 		return nil, nil, "", fmt.Errorf("unknown file extension for pattern '%s'", patternName)
